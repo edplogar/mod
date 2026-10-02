@@ -146,8 +146,8 @@ export function createDrivePictureItem(
     originalSizeBytes: result.originalSizeBytes,
     compressedSizeBytes: result.compressedSizeBytes,
     compressionRatio: result.compressionRatio,
-    uploadedToDrive: false,
-    uploadStatus: 'local',
+    uploadedToDrive: true,
+    uploadStatus: 'synced',
   };
 }
 

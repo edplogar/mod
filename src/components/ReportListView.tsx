@@ -25,11 +25,15 @@ import {
   Sparkles,
   FolderOpen,
   Download,
-  HardDrive
+  HardDrive,
+  RotateCcw,
+  FileText
 } from 'lucide-react';
 import { formatBytes } from '../services/imageCompressionService';
 import { getDriveFolderUrl } from '../services/driveSyncService';
 import { getSystemSettings } from '../services/systemSettingsService';
+
+export type SearchScope = 'all' | 'location' | 'officer' | 'description';
 
 interface ReportListViewProps {
   reports: ModReportItem[];
@@ -49,6 +53,7 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
   initialFilterStatus = 'all',
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
+  const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [selectedDept, setSelectedDept] = useState<string>('all');
   const [selectedStatus, setSelectedStatus] = useState<string>(initialFilterStatus);
   const [selectedOfficer, setSelectedOfficer] = useState<string>('all');
@@ -80,19 +85,20 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
     return list.sort();
   }, [reports]);
 
-  // Filtered reports
+  // Filtered reports with real-time multi-field matching
   const filteredReports = useMemo(() => {
     return reports.filter(item => {
-      // Search keyword
-      if (searchTerm) {
-        const query = searchTerm.toLowerCase();
-        const matchesLoc = item.location.toLowerCase().includes(query);
-        const matchesProb = item.problem.toLowerCase().includes(query);
+      // Real-time search keyword
+      if (searchTerm.trim()) {
+        const query = searchTerm.trim().toLowerCase();
+        const matchesLoc = item.location.toLowerCase().includes(query) || (item.areaGroup && item.areaGroup.toLowerCase().includes(query));
         const matchesOfficer = item.officerName.toLowerCase().includes(query);
-        const matchesDate = item.date.includes(query);
-        if (!matchesLoc && !matchesProb && !matchesOfficer && !matchesDate) {
-          return false;
-        }
+        const matchesDesc = item.problem.toLowerCase().includes(query) || (item.notes && item.notes.toLowerCase().includes(query)) || (item.followUpDept && item.followUpDept.toLowerCase().includes(query));
+
+        if (searchScope === 'location' && !matchesLoc) return false;
+        if (searchScope === 'officer' && !matchesOfficer) return false;
+        if (searchScope === 'description' && !matchesDesc) return false;
+        if (searchScope === 'all' && !matchesLoc && !matchesOfficer && !matchesDesc) return false;
       }
 
       // Dept filter
@@ -112,7 +118,18 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
       return true;
     });
-  }, [reports, searchTerm, selectedDept, selectedStatus, selectedOfficer]);
+  }, [reports, searchTerm, searchScope, selectedDept, selectedStatus, selectedOfficer]);
+
+  const handleResetFilters = () => {
+    setSearchTerm('');
+    setSearchScope('all');
+    setSelectedDept('all');
+    setSelectedStatus('all');
+    setSelectedOfficer('all');
+    setCurrentPage(1);
+  };
+
+  const isFiltered = searchTerm.trim() !== '' || selectedDept !== 'all' || selectedStatus !== 'all' || selectedOfficer !== 'all' || searchScope !== 'all';
 
   const totalPages = Math.ceil(filteredReports.length / pageSize) || 1;
   const paginatedReports = useMemo(() => {
@@ -174,23 +191,39 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Header and Filter Control Panel */}
-      <div className="bg-white rounded-3xl p-5 border border-[#E2E7B8] shadow-xs space-y-4">
+      {/* Real-time Multi-Field Search Card at the Top */}
+      <div className="bg-white rounded-3xl p-5 sm:p-6 border border-[#E2E7B8] shadow-sm space-y-4">
+        {/* Top Header of the Search Panel */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <h2 className="text-lg sm:text-xl font-black text-[#231E1B] tracking-tight flex items-center gap-2">
-              <Layers className="w-5 h-5 text-[#95A823]" />
-              Daftar Riwayat Inspeksi Lapangan MOD
-            </h2>
-            <p className="text-xs text-[#70635A]">
-              Menampilkan {filteredReports.length} dari total {reports.length} catatan inspeksi Hotel Lombok Garden
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-[#95A823] animate-pulse"></span>
+              <h2 className="text-base sm:text-lg font-black text-[#231E1B] tracking-tight flex items-center gap-2">
+                <Search className="w-5 h-5 text-[#95A823]" />
+                Pencarian &amp; Filter Real-Time Laporan MOD
+              </h2>
+            </div>
+            <p className="text-xs text-[#70635A] mt-0.5">
+              Cari seketika berdasarkan <strong>Lokasi/Area</strong>, <strong>Petugas Pelapor</strong>, atau <strong>Isi Temuan &amp; Deskripsi</strong>.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
+            {isFiltered && (
+              <button
+                type="button"
+                onClick={handleResetFilters}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#FAFBF5] hover:bg-[#F2F4DE] text-[#C25941] hover:text-[#9F3E28] border border-[#F2D7D0] rounded-xl text-xs font-bold transition cursor-pointer"
+                title="Reset semua filter pencarian"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>Reset Filter</span>
+              </button>
+            )}
+
             <button
               onClick={onOpenPdfExport}
-              className="flex items-center gap-1.5 px-3.5 py-2 bg-[#877465] hover:bg-[#70635A] text-white rounded-2xl text-xs font-bold shadow-sm transition"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#877465] hover:bg-[#70635A] text-white rounded-xl text-xs font-bold shadow-xs transition"
             >
               <FileDown className="w-4 h-4 text-[#EAEEBB]" />
               <span>Ekspor PDF Format Resmi</span>
@@ -198,25 +231,116 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
           </div>
         </div>
 
-        {/* Search & Filter Controls */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-[#F0F2E2]">
-          {/* Keyword Search */}
-          <div className="relative">
-            <Search className="w-4 h-4 absolute left-3 top-3 text-[#877465]" />
-            <input
-              type="text"
-              placeholder="Cari lokasi, temuan, atau nama..."
-              value={searchTerm}
-              onChange={(e) => {
-                setSearchTerm(e.target.value);
-                setCurrentPage(1);
-              }}
-              className="w-full pl-9 pr-3 py-2 text-xs rounded-xl bg-[#FAFBF5] border border-[#D9DF98] text-[#231E1B] placeholder-[#877465]/70 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#95A823]/20 focus:border-[#95A823] transition"
-            />
+        {/* Big Prominent Real-time Search Input */}
+        <div className="relative">
+          <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
+            <Search className="w-5 h-5 text-[#95A823]" />
+          </div>
+          <input
+            type="text"
+            placeholder={
+              searchScope === 'location'
+                ? "Ketik nama lokasi atau area hotel (misal: Deluxe 102, Resto, Lobby, Pool, Ballroom)..."
+                : searchScope === 'officer'
+                ? "Ketik nama petugas pelapor (misal: Asrul, Wayan, Made, Candra, Komang)..."
+                : searchScope === 'description'
+                ? "Ketik isi temuan atau deskripsi masalah (misal: AC bocor, Keran air, Lampu mati, Aman)..."
+                : "Ketik untuk mencari real-time berdasarkan Lokasi, Petugas Pelapor, atau Isi Temuan..."
+            }
+            value={searchTerm}
+            onChange={(e) => {
+              setSearchTerm(e.target.value);
+              setCurrentPage(1);
+            }}
+            className="w-full pl-11 pr-28 py-3 text-xs sm:text-sm font-semibold rounded-2xl bg-[#FAFBF5] border-2 border-[#D9DF98] text-[#231E1B] placeholder-[#877465]/70 focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#95A823]/20 focus:border-[#95A823] transition shadow-inner"
+          />
+
+          <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-2">
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearchTerm('');
+                  setCurrentPage(1);
+                }}
+                className="w-6 h-6 rounded-full bg-[#EAEBD9] hover:bg-[#D9DF98] text-[#70635A] hover:text-[#231E1B] flex items-center justify-center transition cursor-pointer"
+                title="Hapus kata kunci pencarian"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+
+            <span className="inline-block px-2.5 py-0.5 rounded-lg bg-[#EAEEBB] border border-[#C6CC81] text-[11px] font-bold text-[#5B6713]">
+              {filteredReports.length} Ditemukan
+            </span>
+          </div>
+        </div>
+
+        {/* Search Scope Filter Buttons */}
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+            <span className="text-[11px] font-bold text-[#877465] mr-1">Fokus Bidang:</span>
+            <button
+              type="button"
+              onClick={() => { setSearchScope('all'); setCurrentPage(1); }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                searchScope === 'all'
+                  ? 'bg-[#95A823] text-white shadow-xs'
+                  : 'bg-[#FAFBF5] text-[#70635A] hover:bg-[#EAEEBB]/60 border border-[#D9DF98]'
+              }`}
+            >
+              <span>Semua Kategori</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchScope('location'); setCurrentPage(1); }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                searchScope === 'location'
+                  ? 'bg-[#95A823] text-white shadow-xs'
+                  : 'bg-[#FAFBF5] text-[#70635A] hover:bg-[#EAEEBB]/60 border border-[#D9DF98]'
+              }`}
+            >
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Lokasi / Area</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchScope('officer'); setCurrentPage(1); }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                searchScope === 'officer'
+                  ? 'bg-[#95A823] text-white shadow-xs'
+                  : 'bg-[#FAFBF5] text-[#70635A] hover:bg-[#EAEEBB]/60 border border-[#D9DF98]'
+              }`}
+            >
+              <User className="w-3.5 h-3.5" />
+              <span>Petugas Pelapor</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSearchScope('description'); setCurrentPage(1); }}
+              className={`px-3 py-1 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer ${
+                searchScope === 'description'
+                  ? 'bg-[#95A823] text-white shadow-xs'
+                  : 'bg-[#FAFBF5] text-[#70635A] hover:bg-[#EAEEBB]/60 border border-[#D9DF98]'
+              }`}
+            >
+              <FileText className="w-3.5 h-3.5" />
+              <span>Isi Temuan / Deskripsi</span>
+            </button>
           </div>
 
+          <div className="text-[11px] text-[#70635A]">
+            Menampilkan <strong className="text-[#231E1B]">{filteredReports.length}</strong> dari <strong className="text-[#231E1B]">{reports.length}</strong> total catatan inspeksi
+          </div>
+        </div>
+
+        {/* Secondary Filter Controls */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-[#F0F2E2]">
           {/* Department Filter */}
           <div>
+            <label className="block text-[10px] font-bold uppercase text-[#877465] mb-1 tracking-wider">
+              Departemen Follow-Up
+            </label>
             <select
               value={selectedDept}
               onChange={(e) => {
@@ -238,6 +362,9 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
           {/* Status Filter */}
           <div>
+            <label className="block text-[10px] font-bold uppercase text-[#877465] mb-1 tracking-wider">
+              Status Kondisi
+            </label>
             <select
               value={selectedStatus}
               onChange={(e) => {
@@ -256,6 +383,9 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
           {/* Officer Filter */}
           <div>
+            <label className="block text-[10px] font-bold uppercase text-[#877465] mb-1 tracking-wider">
+              Pilihan Petugas MOD
+            </label>
             <select
               value={selectedOfficer}
               onChange={(e) => {
@@ -293,9 +423,30 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
             <tbody className="divide-y divide-[#F0F2E2] text-xs text-[#61554D]">
               {paginatedReports.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="py-12 text-center text-[#877465]">
-                    <AlertTriangle className="w-8 h-8 mx-auto mb-2 text-[#C6CC81]" />
-                    Tidak ada data inspeksi yang sesuai dengan filter pencarian.
+                  <td colSpan={9} className="py-14 text-center text-[#877465]">
+                    <div className="max-w-md mx-auto space-y-2">
+                      <div className="w-12 h-12 rounded-2xl bg-[#FAFBF5] border border-[#D9DF98] flex items-center justify-center mx-auto text-[#95A823] shadow-xs">
+                        <Search className="w-6 h-6" />
+                      </div>
+                      <p className="font-bold text-sm text-[#231E1B]">
+                        {searchTerm ? `Tidak ditemukan laporan untuk "${searchTerm}"` : 'Tidak ada data inspeksi yang sesuai.'}
+                      </p>
+                      <p className="text-xs text-[#70635A]">
+                        {searchTerm
+                          ? 'Periksa kembali ejaan lokasi, nama petugas pelapor, atau pilih "Semua Kategori".'
+                          : 'Coba ubah kriteria filter departemen, status, atau petugas.'}
+                      </p>
+                      {isFiltered && (
+                        <button
+                          type="button"
+                          onClick={handleResetFilters}
+                          className="mt-3 px-4 py-2 bg-[#95A823] hover:bg-[#83941F] text-white rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 shadow-xs cursor-pointer"
+                        >
+                          <RotateCcw className="w-3.5 h-3.5" />
+                          <span>Reset Semua Filter &amp; Pencarian</span>
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ) : (

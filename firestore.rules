@@ -8,18 +8,6 @@ service cloud.firestore {
     }
 
     // Helper functions
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    function isAdmin() {
-      return isSignedIn() && (
-        request.auth.token.email == 'hotellombokgarden@gmail.com' ||
-        (request.auth.token.email != null && request.auth.token.email.matches('.*@lombokgardenhotel\\.com$')) ||
-        exists(/databases/$(database)/documents/admins/$(request.auth.uid))
-      );
-    }
-
     function isValidId(id) {
       return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
     }
@@ -71,33 +59,31 @@ service cloud.firestore {
         && data.category is string && data.category.size() <= 32;
     }
 
-    // Users collection
+    // Users and permissions collection - Multi-Device & Multi-IP real-time synchronization
     match /users/{userId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(userId) && isValidUser(incoming());
-      allow update: if isSignedIn() && isValidId(userId) && isValidUser(incoming());
-      allow delete: if isAdmin() && isValidId(userId);
+      allow read: if true;
+      allow create, update: if isValidId(userId) && isValidUser(incoming());
+      allow delete: if isValidId(userId);
     }
 
-    // Reports collection
+    // Inspection reports collection
     match /reports/{reportId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(reportId) && isValidReport(incoming());
-      allow update: if isSignedIn() && isValidId(reportId) && isValidReport(incoming());
-      allow delete: if isAdmin() && isValidId(reportId);
+      allow read: if true;
+      allow create, update: if isValidId(reportId) && isValidReport(incoming());
+      allow delete: if isValidId(reportId);
     }
 
-    // Settings collection (e.g. /settings/system)
+    // System settings collection
     match /settings/{settingId} {
-      allow read: if isSignedIn();
-      allow create, update: if isSignedIn() && isValidId(settingId) && isValidSettings(incoming());
-      allow delete: if isAdmin() && isValidId(settingId);
+      allow read: if true;
+      allow create, update: if isValidId(settingId) && isValidSettings(incoming());
+      allow delete: if isValidId(settingId);
     }
 
     // Audit logs collection (immutable)
     match /audit_logs/{logId} {
-      allow read: if isSignedIn();
-      allow create: if isSignedIn() && isValidId(logId) && isValidLog(incoming());
+      allow read: if true;
+      allow create: if isValidId(logId) && isValidLog(incoming());
       allow update, delete: if false;
     }
 

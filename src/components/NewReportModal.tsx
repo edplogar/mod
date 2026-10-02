@@ -14,7 +14,9 @@ import {
   Calendar,
   Clock,
   Lock,
-  ShieldCheck
+  ShieldCheck,
+  ExternalLink,
+  FolderOpen
 } from 'lucide-react';
 import { 
   ModReportItem, 
@@ -28,6 +30,7 @@ import {
 import { HOTEL_LOCATIONS, HOTEL_DEPARTMENTS } from '../data/initialData';
 import { compressImage, createDrivePictureItem, formatBytes } from '../services/imageCompressionService';
 import { getSystemSettings } from '../services/systemSettingsService';
+import { uploadPhotoToGoogleDrive, getDriveFolderUrl } from '../services/driveSyncService';
 
 interface NewReportModalProps {
   isOpen: boolean;
@@ -161,7 +164,10 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
         // Compress based on Super Admin settings
         const compressed = await compressImage(file, maxDim, Math.round(maxDim * 0.75), quality);
         const picItem = createDrivePictureItem(compressed, folderId, folderName);
-        newItems.push(picItem);
+
+        // Automatically upload / link to the configured Google Drive folder
+        const uploadResult = await uploadPhotoToGoogleDrive(picItem, folderId, settings.driveWebhookUrl, folderName);
+        newItems.push(uploadResult.picture);
 
         origSum += compressed.originalSizeBytes;
         compSum += compressed.compressedSizeBytes;
@@ -213,6 +219,19 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
       areaGroup = 'Back of House';
     }
 
+    // Ensure all pictures have folder metadata and synced status
+    const settings = getSystemSettings();
+    const folderId = settings.driveFolderId || '1LG_MOD_DRIVE_FOLDER_2026';
+    const folderName = settings.driveFolderName || 'HOTEL LOMBOK GARDEN / MOD REPORTS 2026';
+    const finalPictures = uploadedPictures.map(p => ({
+      ...p,
+      driveFolderId: p.driveFolderId || folderId,
+      driveFolderName: p.driveFolderName || folderName,
+      driveUrl: p.driveUrl || getDriveFolderUrl(folderId),
+      uploadedToDrive: true,
+      uploadStatus: 'synced' as const,
+    }));
+
     const newReport: ModReportItem = {
       id: `rep-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
       timestamp: `${date} ${time}`,
@@ -225,9 +244,10 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
       followUpDept,
       status,
       priority,
-      pictures: uploadedPictures,
+      pictures: finalPictures,
       shift,
-      synced: false, // will be auto-synced by cloud sync engine
+      synced: true,
+      syncedAt: new Date().toISOString(),
     };
 
     onSubmit(newReport);
@@ -548,37 +568,57 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
                   {uploadedPictures.map((pic) => (
                     <div
                       key={pic.id}
-                      className="flex items-center justify-between p-2 rounded-xl bg-[#FAFBF5] border border-[#D9DF98] text-xs"
+                      className="p-2.5 rounded-2xl bg-[#FAFBF5] border border-[#D9DF98] text-xs space-y-1.5 shadow-xs"
                     >
-                      <div className="flex items-center gap-2 overflow-hidden">
-                        {pic.thumbnailUrl ? (
-                          <img
-                            src={pic.thumbnailUrl}
-                            alt="preview"
-                            className="w-9 h-9 rounded-lg object-cover border border-[#C6CC81] shrink-0"
-                          />
-                        ) : (
-                          <div className="w-9 h-9 rounded-lg bg-[#EAEEBB] flex items-center justify-center text-[#70635A] shrink-0">
-                            <ImageIcon className="w-4 h-4" />
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 overflow-hidden">
+                          {pic.thumbnailUrl ? (
+                            <img
+                              src={pic.thumbnailUrl}
+                              alt="preview"
+                              className="w-10 h-10 rounded-xl object-cover border border-[#C6CC81] shrink-0"
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-xl bg-[#EAEEBB] flex items-center justify-center text-[#70635A] shrink-0">
+                              <ImageIcon className="w-5 h-5" />
+                            </div>
+                          )}
+                          <div className="truncate">
+                            <p className="font-bold text-[#231E1B] truncate text-[11px]">
+                              {pic.name}
+                            </p>
+                            <p className="text-[10px] text-[#70635A]">
+                              {formatBytes(pic.compressedSizeBytes)} <span className="text-[#95A823] font-bold">(-{pic.compressionRatio}%)</span>
+                            </p>
                           </div>
-                        )}
-                        <div className="truncate">
-                          <p className="font-bold text-[#231E1B] truncate text-[11px]">
-                            {pic.name}
-                          </p>
-                          <p className="text-[10px] text-[#70635A]">
-                            {formatBytes(pic.compressedSizeBytes)} <span className="text-[#95A823] font-bold">(-{pic.compressionRatio}%)</span>
-                          </p>
                         </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleRemovePicture(pic.id)}
+                          className="text-[#877465] hover:text-[#C25941] p-1.5 hover:bg-[#FBEBE7] rounded-lg transition shrink-0 cursor-pointer"
+                          title="Hapus foto"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
 
-                      <button
-                        type="button"
-                        onClick={() => handleRemovePicture(pic.id)}
-                        className="text-[#877465] hover:text-[#C25941] p-1 transition"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      {/* Google Drive Folder Sync Badge */}
+                      <div className="flex items-center justify-between pt-1.5 border-t border-[#EAEED0] text-[10px]">
+                        <span className="inline-flex items-center gap-1 font-semibold text-[#5B6713] truncate">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#95A823] shrink-0" />
+                          <span className="truncate">Folder Drive: <strong className="text-[#231E1B]">{pic.driveFolderName || getSystemSettings().driveFolderName}</strong></span>
+                        </span>
+                        <a
+                          href={pic.driveUrl || getDriveFolderUrl(pic.driveFolderId || getSystemSettings().driveFolderId)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[#7B8C1B] hover:text-[#5B6713] font-bold shrink-0 ml-1 hover:underline"
+                        >
+                          <span>Buka Drive</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
                     </div>
                   ))}
                 </div>

@@ -2,17 +2,18 @@ import { ModReportItem, CloudSyncState, PictureItem } from '../types';
 import { parseCSVToReports, RAW_MOD_CSV } from '../data/initialData';
 import { getSystemSettings } from './systemSettingsService';
 import { syncAllPhotosToDrive, extractDriveFolderId, getDriveFolderUrl } from './driveSyncService';
-import { batchSyncReportsToFirestore, saveReportToFirestore } from './firebase';
+import { batchSyncReportsToFirestore, saveReportToFirestore, clearAllReportsFromFirestore } from './firebase';
 
 const STORAGE_KEY = 'mod_report_logar_data_v2';
 const SYNC_CONFIG_KEY = 'mod_report_logar_sync_config_v1';
+const CLEARED_KEY = 'mod_report_logar_cleared_v1';
 
 export function loadReports(): ModReportItem[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) {
+    if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         return parsed;
       }
     }
@@ -20,10 +21,16 @@ export function loadReports(): ModReportItem[] {
     console.error('Error loading reports from localStorage', e);
   }
 
-  // Seed from user's CSV dataset
-  const seeded = parseCSVToReports(RAW_MOD_CSV);
-  saveReports(seeded);
-  return seeded;
+  // If reports have been explicitly cleared or freshly started
+  const isCleared = localStorage.getItem(CLEARED_KEY);
+  if (isCleared === 'true') {
+    saveReports([]);
+    return [];
+  }
+
+  // Default empty initial list as requested
+  saveReports([]);
+  return [];
 }
 
 export function saveReports(reports: ModReportItem[]): void {
@@ -31,6 +38,21 @@ export function saveReports(reports: ModReportItem[]): void {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(reports));
   } catch (e) {
     console.error('Error saving reports to localStorage', e);
+  }
+}
+
+export async function clearAllReports(): Promise<void> {
+  localStorage.setItem(CLEARED_KEY, 'true');
+  saveReports([]);
+  try {
+    await clearAllReportsFromFirestore();
+  } catch (err) {
+    console.warn('Error clearing Firestore reports:', err);
+  }
+  try {
+    window.dispatchEvent(new CustomEvent('logar_reports_updated', { detail: [] }));
+  } catch {
+    // ignore
   }
 }
 

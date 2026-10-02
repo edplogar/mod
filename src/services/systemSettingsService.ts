@@ -227,9 +227,8 @@ export function restoreSystemFromBackup(jsonString: string, actor: string = 'Sup
 }
 
 export function factoryResetSystem(actor: string = 'Super Admin'): void {
-  const defaultReports = parseCSVToReports(RAW_MOD_CSV);
-  saveReports(defaultReports);
+  saveReports([]);
   saveAllUsers(INITIAL_HOTEL_USERS);
   saveSystemSettings(DEFAULT_SYSTEM_SETTINGS);
-  addAuditLog('FACTORY_RESET', 'Sistem di-reset ke data bawaan awal Hotel Lombok Garden', 'DATA', actor);
+  addAuditLog('FACTORY_RESET', 'Sistem dibersihkan ke kondisi awal Hotel Lombok Garden', 'DATA', actor);
 }

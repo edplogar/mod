@@ -325,8 +325,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {/* KPI 1: Total Inspeksi */}
         <div 
-          onClick={() => onNavigateToReports()}
-          className="bg-white rounded-3xl p-5 border border-[#E2E7B8] shadow-xs hover:border-[#95A823] hover:shadow-md transition cursor-pointer group"
+          onClick={() => {
+            if (currentUser.role === 'Super Admin') {
+              onNavigateToReports();
+            }
+          }}
+          className={`bg-white rounded-3xl p-5 border border-[#E2E7B8] shadow-xs transition group ${
+            currentUser.role === 'Super Admin' 
+              ? 'hover:border-[#95A823] hover:shadow-md cursor-pointer' 
+              : ''
+          }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#70635A] uppercase tracking-wider">
@@ -342,16 +350,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>Rata-rata 4-8 titik per shift</span>
-            <span className="text-[#95A823] font-bold flex items-center gap-0.5">
-              Lihat data <ArrowRight className="w-3 h-3" />
-            </span>
+            {currentUser.role === 'Super Admin' ? (
+              <span className="text-[#95A823] font-bold flex items-center gap-0.5">
+                Lihat data <ArrowRight className="w-3 h-3" />
+              </span>
+            ) : (
+              <span className="text-[#877465] text-[11px] font-medium">Monitoring MOD</span>
+            )}
           </div>
         </div>
 
         {/* KPI 2: Kondisi Aman */}
         <div 
-          onClick={() => onNavigateToReports('Aman')}
-          className="bg-white rounded-3xl p-5 border border-[#C6CC81] shadow-xs hover:border-[#95A823] hover:shadow-md transition cursor-pointer group"
+          onClick={() => {
+            if (currentUser.role === 'Super Admin') {
+              onNavigateToReports('Aman');
+            }
+          }}
+          className={`bg-white rounded-3xl p-5 border border-[#C6CC81] shadow-xs transition group ${
+            currentUser.role === 'Super Admin' 
+              ? 'hover:border-[#95A823] hover:shadow-md cursor-pointer' 
+              : ''
+          }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#70635A] uppercase tracking-wider">
@@ -369,16 +389,28 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>Sikon operasional standar</span>
-            <span className="text-[#95A823] font-bold flex items-center gap-0.5">
-              Filter aman <ArrowRight className="w-3 h-3" />
-            </span>
+            {currentUser.role === 'Super Admin' ? (
+              <span className="text-[#95A823] font-bold flex items-center gap-0.5">
+                Filter aman <ArrowRight className="w-3 h-3" />
+              </span>
+            ) : (
+              <span className="text-[#5B6713] text-[11px] font-semibold">Terkendali</span>
+            )}
           </div>
         </div>
 
         {/* KPI 3: Temuan / Perlu Follow Up */}
         <div 
-          onClick={() => onNavigateToReports('Perlu Follow Up')}
-          className="bg-white rounded-3xl p-5 border border-[#F2D7D0] shadow-xs hover:border-[#C25941] hover:shadow-md transition cursor-pointer group"
+          onClick={() => {
+            if (currentUser.role === 'Super Admin') {
+              onNavigateToReports('Perlu Follow Up');
+            }
+          }}
+          className={`bg-white rounded-3xl p-5 border border-[#F2D7D0] shadow-xs transition group ${
+            currentUser.role === 'Super Admin' 
+              ? 'hover:border-[#C25941] hover:shadow-md cursor-pointer' 
+              : ''
+          }`}
         >
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#70635A] uppercase tracking-wider">
@@ -396,9 +428,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>HK &amp; Engineering Terbanyak</span>
-            <span className="text-[#C25941] font-bold flex items-center gap-0.5">
-              Tindak lanjut <ArrowRight className="w-3 h-3" />
-            </span>
+            {currentUser.role === 'Super Admin' ? (
+              <span className="text-[#C25941] font-bold flex items-center gap-0.5">
+                Tindak lanjut <ArrowRight className="w-3 h-3" />
+              </span>
+            ) : (
+              <span className="text-[#C25941] text-[11px] font-semibold">Prioritas</span>
+            )}
           </div>
         </div>
 

@@ -4,7 +4,8 @@ import {
   saveReports, 
   getSyncState, 
   syncReportsToCloud, 
-  saveSyncConfig 
+  saveSyncConfig,
+  clearAllReports
 } from './services/storageService';
 import { 
   getStoredUser, 
@@ -88,9 +89,19 @@ export default function App() {
 
   // Initialize data & real-time Firestore sync listeners
   useEffect(() => {
-    const loaded = loadReports();
-    setReports(loaded);
-    setSyncState(getSyncState(loaded));
+    // Check if reports have been cleared as requested by user ("hapus semua data laporan yang ada")
+    const hasCleared = localStorage.getItem('mod_report_has_cleared_by_user_req_v1');
+    if (!hasCleared) {
+      localStorage.setItem('mod_report_has_cleared_by_user_req_v1', 'true');
+      clearAllReports().then(() => {
+        setReports([]);
+        setSyncState(getSyncState([]));
+      });
+    } else {
+      const loaded = loadReports();
+      setReports(loaded);
+      setSyncState(getSyncState(loaded));
+    }
 
     // Initialize Firebase Auth & seed initial users to Firestore
     initFirebaseAuth().then(() => {
@@ -102,7 +113,7 @@ export default function App() {
     // Real-time synchronization for MOD reports across all devices & IPs
     const unsubReports = subscribeToFirestoreReports(
       (cloudReports) => {
-        if (cloudReports && cloudReports.length > 0) {
+        if (cloudReports) {
           setReports(cloudReports);
           saveReports(cloudReports);
           setSyncState(getSyncState(cloudReports));
@@ -256,6 +267,15 @@ export default function App() {
     showToast('Catatan inspeksi dihapus.');
   };
 
+  // Clear all reports across Firestore & Local Storage
+  const handleClearAllReports = async () => {
+    setReports([]);
+    saveReports([]);
+    setSyncState(getSyncState([]));
+    await clearAllReports();
+    showToast('Seluruh data laporan inspeksi berhasil dihapus tuntas.');
+  };
+
   const handleLogout = () => {
     clearSessionUser();
     clearSuperAdminSession();
@@ -265,8 +285,22 @@ export default function App() {
     showToast('Anda telah berhasil keluar dari sistem MOD LOGAR.');
   };
 
-  // Navigate to reports tab with optional filter
+  // Check if current user is Super Admin
+  const isSuperAdmin = currentUser?.role === 'Super Admin' || isSuperAdminAuth;
+
+  // Enforce RBAC: If not Super Admin, activeTab MUST be 'dashboard'
+  useEffect(() => {
+    if (!isSuperAdmin && activeTab !== 'dashboard') {
+      setActiveTab('dashboard');
+    }
+  }, [isSuperAdmin, activeTab]);
+
+  // Navigate to reports tab with optional filter - restricted to Super Admin
   const handleNavigateToReports = (statusFilter?: string) => {
+    if (!isSuperAdmin) {
+      showToast('Akses dibatasi: Hanya Super Admin yang dapat mengakses riwayat data laporan.');
+      return;
+    }
     if (statusFilter) {
       setReportFilterStatus(statusFilter);
     } else {
@@ -276,6 +310,10 @@ export default function App() {
   };
 
   const handleOpenSuperAdmin = () => {
+    if (!isSuperAdmin) {
+      showToast('Akses dibatasi: Khusus untuk akun Super Administrator.');
+      return;
+    }
     if (isSuperAdminSessionValid()) {
       setIsSuperAdminAuth(true);
       setIsAdminView(true);
@@ -355,7 +393,7 @@ export default function App() {
         </div>
       )}
 
-      {/* Main Navbar */}
+      {/* Left Sidebar Navigation with Autohide Feature & Role-based Access */}
       <Navbar
         activeTab={activeTab}
         setActiveTab={setActiveTab}
@@ -363,67 +401,100 @@ export default function App() {
         syncState={syncState}
         onTriggerSync={handleTriggerSync}
         onOpenNewReport={() => setIsNewReportOpen(true)}
-        onOpenPdfExport={() => setIsPdfExportOpen(true)}
-        onOpenCloudSync={() => setIsCloudSyncOpen(true)}
+        onOpenPdfExport={() => {
+          if (!isSuperAdmin) {
+            showToast('Akses dibatasi: Khusus Super Admin.');
+            return;
+          }
+          setIsPdfExportOpen(true);
+        }}
+        onOpenCloudSync={() => {
+          if (!isSuperAdmin) {
+            showToast('Akses dibatasi: Khusus Super Admin.');
+            return;
+          }
+          setIsCloudSyncOpen(true);
+        }}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenSuperAdmin={handleOpenSuperAdmin}
         isSuperAdminAuth={isSuperAdminAuth}
         onLogout={handleLogout}
       />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {activeTab === 'dashboard' ? (
-          <DashboardView
-            reports={reports}
-            currentUser={currentUser}
-            onNavigateToReports={handleNavigateToReports}
-            onOpenNewReport={() => setIsNewReportOpen(true)}
-          />
-        ) : (
-          <ReportListView
-            reports={reports}
-            currentUser={currentUser}
-            onUpdateStatus={handleUpdateStatus}
-            onDeleteReport={handleDeleteReport}
-            onOpenPdfExport={() => setIsPdfExportOpen(true)}
-            initialFilterStatus={reportFilterStatus}
-          />
-        )}
-      </main>
-
-      {/* Footer in Official Lombok Garden Hotel Dark Earth Timber */}
-      <footer className="bg-[#231E1B] border-t border-[#3D352F] text-[#C6CC81] py-7 text-xs mt-12">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-center sm:text-left">
-            <div className="flex items-center justify-center sm:justify-start gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#95A823]"></span>
-              <span className="font-extrabold text-white tracking-wide">HOTEL LOMBOK GARDEN</span>
-            </div>
-            <span className="hidden sm:inline text-[#877465]">&bull;</span>
-            <span className="text-[#D9DF98] font-serif italic text-sm">Experience the Green of the City</span>
-            <span className="hidden md:inline text-[#877465]">&bull;</span>
-            <span className="text-[#877465] hidden md:inline">MOD REPORT LOGAR &bull; Sistem Monitoring &amp; Patroli</span>
+      {/* Main Content Layout with Left Offset on Desktop for Autohide Sidebar */}
+      <div className="flex-1 flex flex-col min-w-0 lg:pl-[72px] transition-all duration-300">
+        {/* Top Slim Hotel Identity Bar */}
+        <div className="bg-[#95A823] px-4 py-1.5 text-xs text-white font-medium flex items-center justify-between border-b border-[#7B8C1B]/40">
+          <div className="flex items-center gap-2">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#EAEEBB] animate-pulse"></span>
+            <span className="font-semibold tracking-wide text-white text-[11px] truncate">
+              HOTEL LOMBOK GARDEN &bull; SISTEM RESMI MANAGER ON DUTY (MOD LOGAR)
+            </span>
           </div>
-
-          <div className="flex items-center gap-3 text-[11px] text-[#FAFBF5]/90">
-            <span className="flex items-center gap-1 text-[#95A823] font-semibold">
-              <Cloud className="w-3.5 h-3.5" /> Auto-Sync Aktif
+          <div className="flex items-center gap-3 text-[11px] text-[#FAFBF5] opacity-95 shrink-0">
+            <span className="hidden sm:inline">Jl. Bung Karno No. 7, Mataram</span>
+            <span className="hidden sm:inline">&bull;</span>
+            <span className="font-bold text-[#EAEEBB] bg-[#231E1B]/30 px-2 py-0.5 rounded">
+              {isSuperAdmin ? 'Super Admin' : 'Petugas MOD'}
             </span>
-            <span className="text-[#877465]">&bull;</span>
-            <span className="flex items-center gap-1 text-[#EAEEBB]">
-              <HardDrive className="w-3.5 h-3.5 text-[#C6CC81]" /> Google Drive Kompresi On
-            </span>
-            <span className="text-[#877465]">&bull;</span>
-            <button
-              onClick={handleOpenSuperAdmin}
-              className="text-[#FFBC7D] hover:text-[#FFAE64] underline font-bold"
-            >
-              Super Admin Backend
-            </button>
           </div>
         </div>
-      </footer>
+
+        {/* Main Content Area */}
+        <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          {activeTab === 'dashboard' || !isSuperAdmin ? (
+            <DashboardView
+              reports={reports}
+              currentUser={currentUser}
+              onNavigateToReports={handleNavigateToReports}
+              onOpenNewReport={() => setIsNewReportOpen(true)}
+            />
+          ) : (
+            <ReportListView
+              reports={reports}
+              currentUser={currentUser}
+              onUpdateStatus={handleUpdateStatus}
+              onDeleteReport={handleDeleteReport}
+              onOpenPdfExport={() => setIsPdfExportOpen(true)}
+              onClearAllReports={handleClearAllReports}
+              initialFilterStatus={reportFilterStatus}
+            />
+          )}
+        </main>
+
+        {/* Footer in Official Lombok Garden Hotel Dark Earth Timber */}
+        <footer className="bg-[#231E1B] border-t border-[#3D352F] text-[#C6CC81] py-6 text-xs mt-12">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 text-center sm:text-left">
+              <div className="flex items-center justify-center sm:justify-start gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#95A823]"></span>
+                <span className="font-extrabold text-white tracking-wide">HOTEL LOMBOK GARDEN</span>
+              </div>
+              <span className="hidden sm:inline text-[#877465]">&bull;</span>
+              <span className="text-[#D9DF98] font-serif italic text-sm">Experience the Green of the City</span>
+              <span className="hidden md:inline text-[#877465]">&bull;</span>
+              <span className="text-[#877465] hidden md:inline">MOD REPORT LOGAR</span>
+            </div>
+
+            <div className="flex items-center gap-3 text-[11px] text-[#FAFBF5]/90">
+              <span className="flex items-center gap-1 text-[#95A823] font-semibold">
+                <Cloud className="w-3.5 h-3.5" /> Auto-Sync Aktif
+              </span>
+              {isSuperAdmin && (
+                <>
+                  <span className="text-[#877465]">&bull;</span>
+                  <button
+                    onClick={handleOpenSuperAdmin}
+                    className="text-[#FFBC7D] hover:text-[#FFAE64] underline font-bold cursor-pointer"
+                  >
+                    Super Admin Backend
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        </footer>
+      </div>
 
       {/* Modals */}
       <NewReportModal

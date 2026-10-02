@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { 
   Cloud, 
   CloudOff, 
@@ -10,7 +10,16 @@ import {
   BarChart3, 
   ListFilter,
   KeyRound,
-  LogOut
+  LogOut,
+  Menu,
+  X,
+  Pin,
+  PinOff,
+  ShieldCheck,
+  User,
+  Sparkles,
+  ChevronRight,
+  ShieldAlert
 } from 'lucide-react';
 import { UserProfile, CloudSyncState } from '../types';
 import { LogarLogo } from './LogarLogo';
@@ -44,163 +53,371 @@ export const Navbar: React.FC<NavbarProps> = ({
   isSuperAdminAuth,
   onLogout,
 }) => {
+  // Autohide state: unpinned by default so autohide activates on mouse hover
+  const [isPinned, setIsPinned] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
+  const [isMobileOpen, setIsMobileOpen] = useState(false);
+
+  // Computed state: sidebar expands on hover, when pinned, or when opened on mobile
+  const isExpanded = isPinned || isHovered || isMobileOpen;
+
+  // Strict RBAC: Check if current user is Super Admin
+  const isSuperAdmin = currentUser.role === 'Super Admin' || isSuperAdminAuth;
+
+  const handleTabChange = (tab: 'dashboard' | 'reports') => {
+    setActiveTab(tab);
+    setIsMobileOpen(false);
+  };
+
+  const handleActionClick = (action: () => void) => {
+    action();
+    setIsMobileOpen(false);
+  };
+
   return (
-    <header className="sticky top-0 z-30 bg-[#231E1B] border-b border-[#3D352F] text-white shadow-xl">
-      {/* Top Banner / Hotel Lombok Garden Official Identity Bar */}
-      <div className="bg-[#95A823] px-4 py-1 text-xs text-white font-medium flex items-center justify-between border-b border-[#7B8C1B]/40">
-        <div className="flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-[#EAEEBB] animate-pulse"></span>
-          <span className="font-semibold tracking-wide text-white text-[11px]">
-            LOMBOK GARDEN HOTEL &bull; SISTEM RESMI MANAGER ON DUTY (MOD LOGAR)
-          </span>
+    <>
+      {/* Mobile Top Bar with Hamburger Toggle */}
+      <div className="lg:hidden sticky top-0 z-30 bg-[#231E1B] border-b border-[#3D352F] text-white px-4 py-2.5 flex items-center justify-between shadow-lg">
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setIsMobileOpen(true)}
+            className="p-2 rounded-xl bg-[#2E2824] hover:bg-[#3D352F] text-[#EAEEBB] border border-[#453D37] transition"
+            title="Buka Menu Navigasi"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <LogarLogo variant="full" light={true} className="h-7 w-auto" />
         </div>
-        <div className="flex items-center gap-3 text-[11px] text-[#FAFBF5] opacity-95">
-          <span className="hidden sm:inline">Jl. Bung Karno No. 7, Mataram</span>
-          <span className="hidden sm:inline">&bull;</span>
-          <span>Google Drive Cloud Sync Aktif</span>
-          <span className="hidden md:inline">&bull;</span>
-          <span className="hidden md:inline text-[#EAEEBB] font-semibold">Kompresi Hemat &gt;90%</span>
+
+        <div className="flex items-center gap-2">
+          {/* Quick Input MOD button on mobile */}
+          <button
+            onClick={onOpenNewReport}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#95A823] hover:bg-[#83941F] text-white shadow-sm transition"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>Input</span>
+          </button>
+
+          {/* User Avatar */}
+          <button
+            onClick={onOpenAuth}
+            className="w-8 h-8 rounded-xl overflow-hidden border border-[#95A823] shrink-0"
+            title={currentUser.name}
+          >
+            <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+          </button>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-center justify-between h-17">
-          {/* Logo with Lombok Garden Hotel branding */}
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveTab('dashboard')}>
-            <LogarLogo variant="full" light={true} />
+      {/* Mobile Backdrop Overlay */}
+      {isMobileOpen && (
+        <div
+          onClick={() => setIsMobileOpen(false)}
+          className="fixed inset-0 bg-black/70 backdrop-blur-xs z-40 lg:hidden transition-opacity"
+        />
+      )}
+
+      {/* Left Sidebar with Smooth Autohide Feature */}
+      <aside
+        onMouseEnter={() => { if (!isPinned) setIsHovered(true); }}
+        onMouseLeave={() => { if (!isPinned) setIsHovered(false); }}
+        className={`fixed left-0 top-0 bottom-0 z-40 bg-[#231E1B] border-r border-[#3D352F] text-white flex flex-col justify-between transition-all duration-300 ease-in-out shadow-2xl ${
+          isExpanded ? 'w-64' : 'w-[72px]'
+        } ${
+          isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        {/* Top Section: Branding & Pin Toggle */}
+        <div className="p-3.5 border-b border-[#3D352F] flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            {isExpanded ? (
+              <div 
+                className="flex items-center gap-2 cursor-pointer overflow-hidden" 
+                onClick={() => handleTabChange('dashboard')}
+              >
+                <LogarLogo variant="full" light={true} />
+              </div>
+            ) : (
+              <div 
+                className="mx-auto cursor-pointer" 
+                onClick={() => handleTabChange('dashboard')}
+                title="Hotel Lombok Garden - MOD LOGAR"
+              >
+                <LogarLogo variant="icon" className="w-10 h-10" />
+              </div>
+            )}
+
+            {/* Desktop Pin / Autohide Toggle Button */}
+            {isExpanded && (
+              <button
+                type="button"
+                onClick={() => setIsPinned(!isPinned)}
+                className={`hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition shrink-0 ${
+                  isPinned 
+                    ? 'bg-[#95A823] text-white shadow-xs' 
+                    : 'bg-[#2E2824] hover:bg-[#3B332E] text-[#C6CC81] hover:text-white'
+                }`}
+                title={isPinned ? 'Lepas Sematan (Aktifkan Mode Autohide)' : 'Sematkan Sidebar (Tetap Terbuka)'}
+              >
+                {isPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
+              </button>
+            )}
+
+            {/* Mobile Close Button */}
+            <button
+              onClick={() => setIsMobileOpen(false)}
+              className="lg:hidden p-1 rounded-lg text-[#C6CC81] hover:text-white hover:bg-[#322A25]"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Navigation Tabs */}
-          <div className="flex items-center bg-[#2E2824] p-1 rounded-2xl border border-[#453D37]">
+          {/* Role Status Tag when Expanded */}
+          {isExpanded && (
+            <div className={`px-2.5 py-1 rounded-xl text-[10px] font-bold flex items-center justify-between border ${
+              isSuperAdmin 
+                ? 'bg-[#FFBC7D]/15 text-[#FFBC7D] border-[#FFBC7D]/30' 
+                : 'bg-[#EAEEBB]/15 text-[#EAEEBB] border-[#C6CC81]/30'
+            }`}>
+              <span className="flex items-center gap-1.5 truncate">
+                {isSuperAdmin ? <ShieldCheck className="w-3 h-3 text-[#FFBC7D]" /> : <User className="w-3 h-3 text-[#95A823]" />}
+                <span className="truncate">{isSuperAdmin ? 'Role: Super Administrator' : 'Role: Petugas MOD Officer'}</span>
+              </span>
+              <span className="text-[9px] opacity-75">
+                {isSuperAdmin ? 'Akses Penuh' : 'Akses Khusus'}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Middle Section: Navigation Menu Items (Strictly Filtered by Role) */}
+        <div className="flex-1 overflow-y-auto px-2.5 py-4 space-y-4">
+          {/* Section 1: Main View Navigation */}
+          <div className="space-y-1">
+            {isExpanded && (
+              <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#877465]">
+                Menu Tampilan
+              </p>
+            )}
+
+            {/* 1. Dasbor Visual - Accessible to BOTH MOD Officer & Super Admin */}
             <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
+              onClick={() => handleTabChange('dashboard')}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
                 activeTab === 'dashboard'
                   ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
-                  : 'text-[#D9DF98] hover:text-white hover:bg-[#3B332E]'
-              }`}
+                  : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
+              } ${!isExpanded ? 'justify-center px-0' : ''}`}
+              title="Dasbor Visual & Statistik"
             >
-              <BarChart3 className="w-4 h-4" />
-              <span>Dasbor Visual</span>
-            </button>
-            <button
-              onClick={() => setActiveTab('reports')}
-              className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold rounded-xl transition-all ${
-                activeTab === 'reports'
-                  ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
-                  : 'text-[#D9DF98] hover:text-white hover:bg-[#3B332E]'
-              }`}
-            >
-              <ListFilter className="w-4 h-4" />
-              <span>Data Laporan</span>
-            </button>
-          </div>
-
-          {/* Actions & User Profile */}
-          <div className="flex items-center gap-2 sm:gap-3">
-            {/* Real-Time Firestore Sync Indicator */}
-            <button
-              onClick={onOpenCloudSync}
-              title="Firebase Firestore Real-Time Database Aktif (Multi-Perangkat & IP)"
-              className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-[11px] font-bold bg-[#1E2B14] hover:bg-[#253619] border border-[#95A823]/50 text-[#EAEEBB] transition"
-            >
-              <span className="w-2 h-2 rounded-full bg-[#95A823] animate-pulse"></span>
-              <span>⚡ Real-Time Multi-IP</span>
-            </button>
-
-            {/* Cloud Sync Status Indicator */}
-            <button
-              onClick={onOpenCloudSync}
-              title="Status Sinkronisasi Cloud & Google Drive"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs bg-[#2E2824] hover:bg-[#3B332E] border border-[#453D37] transition text-[#D9DF98]"
-            >
-              {syncState.isOnline ? (
-                syncState.isSyncing ? (
-                  <RefreshCw className="w-3.5 h-3.5 text-[#FFBC7D] animate-spin" />
-                ) : syncState.pendingCount > 0 ? (
-                  <Cloud className="w-3.5 h-3.5 text-[#FFBC7D]" />
-                ) : (
-                  <CheckCircle2 className="w-3.5 h-3.5 text-[#95A823]" />
-                )
-              ) : (
-                <CloudOff className="w-3.5 h-3.5 text-rose-400" />
+              <BarChart3 className="w-4 h-4 shrink-0" />
+              {isExpanded && (
+                <div className="text-left flex-1 truncate">
+                  <p className="leading-tight truncate">Dasbor Visual</p>
+                  <p className="text-[10px] opacity-80 font-normal truncate">Statistik &amp; Grafik Temuan</p>
+                </div>
               )}
-              <span className="hidden md:inline font-medium">
-                {syncState.isSyncing
-                  ? 'Menyinkronkan...'
-                  : syncState.pendingCount > 0
-                  ? `${syncState.pendingCount} Belum Sinkron`
-                  : 'Drive Synced'}
-              </span>
             </button>
 
-            {/* Export PDF Button in Warm Earth tone */}
-            <button
-              onClick={onOpenPdfExport}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#877465] hover:bg-[#70635A] text-white shadow-sm border border-[#9A8778]/40 transition"
-            >
-              <FileText className="w-3.5 h-3.5 text-[#EAEEBB]" />
-              <span className="hidden sm:inline">Ekspor PDF</span>
-            </button>
-
-            {/* Input New Inspection Report in Signature Lombok Garden Green */}
-            <button
-              onClick={onOpenNewReport}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-black bg-[#95A823] hover:bg-[#85971E] text-white shadow-md shadow-[#95A823]/30 transition transform hover:-translate-y-0.5"
-            >
-              <PlusCircle className="w-4 h-4 text-white" />
-              <span>Input MOD</span>
-            </button>
-
-            {/* Super Admin Gateway */}
-            <button
-              onClick={onOpenSuperAdmin}
-              title="Akses Backend Super Admin (Restricted)"
-              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition ${
-                isSuperAdminAuth
-                  ? 'bg-[#FFBC7D]/20 text-[#FFBC7D] border-[#FFBC7D]/60 hover:bg-[#FFBC7D]/30'
-                  : 'bg-[#2E2824] text-[#D9DF98] border-[#453D37] hover:text-[#FFBC7D] hover:border-[#FFBC7D]/50'
-              }`}
-            >
-              <KeyRound className="w-3.5 h-3.5 text-[#FFBC7D]" />
-              <span className="hidden xl:inline">Super Admin</span>
-            </button>
-
-            {/* User Profile Info */}
-            <button
-              onClick={onOpenAuth}
-              className="flex items-center gap-2 pl-1.5 pr-2.5 py-1 rounded-2xl bg-[#2E2824] hover:bg-[#3B332E] border border-[#453D37] transition cursor-pointer"
-              title="Profil Petugas Aktif"
-            >
-              <img
-                src={currentUser.avatar}
-                alt={currentUser.name}
-                className="w-7 h-7 rounded-xl object-cover border-2 border-[#95A823]"
-              />
-              <div className="text-left hidden lg:block">
-                <p className="text-xs font-bold text-white leading-tight truncate max-w-[120px]">
-                  {currentUser.name}
-                </p>
-                <p className="text-[10px] text-[#C6CC81] leading-tight font-medium">
-                  {currentUser.role}
-                </p>
-              </div>
-            </button>
-
-            {/* Logout Button */}
-            {onLogout && (
+            {/* 2. Data Laporan (ReportListView) - ONLY Accessible to Super Admin */}
+            {isSuperAdmin && (
               <button
-                onClick={onLogout}
-                title="Keluar / Logout dari Sistem"
-                className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl text-xs font-semibold bg-[#2E2824] hover:bg-[#C25941]/20 text-[#D9DF98] hover:text-[#FFBC7D] border border-[#453D37] hover:border-[#C25941]/60 transition cursor-pointer"
+                onClick={() => handleTabChange('reports')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === 'reports'
+                    ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
+                    : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
+                } ${!isExpanded ? 'justify-center px-0' : ''}`}
+                title="Data Riwayat Laporan (Khusus Super Admin)"
               >
-                <LogOut className="w-3.5 h-3.5 text-[#FFBC7D]" />
-                <span className="hidden sm:inline">Keluar</span>
+                <ListFilter className="w-4 h-4 shrink-0" />
+                {isExpanded && (
+                  <div className="text-left flex-1 truncate">
+                    <p className="leading-tight truncate">Data Laporan</p>
+                    <p className="text-[10px] opacity-80 font-normal truncate">Riwayat &amp; Filter Inspeksi</p>
+                  </div>
+                )}
+                {isExpanded && (
+                  <span className="text-[9px] bg-[#231E1B] text-[#EAEEBB] px-1.5 py-0.5 rounded font-mono font-bold">
+                    Admin
+                  </span>
+                )}
               </button>
             )}
           </div>
+
+          {/* Section 2: Input & Actions */}
+          <div className="space-y-1 pt-2 border-t border-[#3D352F]">
+            {isExpanded && (
+              <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#877465]">
+                Tindakan Petugas
+              </p>
+            )}
+
+            {/* 3. Input Laporan MOD - Accessible to BOTH MOD Officer & Super Admin */}
+            <button
+              onClick={() => handleActionClick(onOpenNewReport)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-black transition-all bg-[#95A823] hover:bg-[#83941F] text-white shadow-md shadow-[#95A823]/25 transform hover:-translate-y-0.5 ${
+                !isExpanded ? 'justify-center px-0' : ''
+              }`}
+              title="Input Laporan Inspeksi Baru"
+            >
+              <PlusCircle className="w-4 h-4 shrink-0 text-white" />
+              {isExpanded && (
+                <div className="text-left flex-1 truncate">
+                  <p className="leading-tight truncate">+ Input Data MOD</p>
+                  <p className="text-[10px] opacity-85 font-normal truncate">Patroli &amp; Temuan Baru</p>
+                </div>
+              )}
+            </button>
+
+            {/* 4. Ekspor PDF - ONLY Accessible to Super Admin */}
+            {isSuperAdmin && (
+              <button
+                onClick={() => handleActionClick(onOpenPdfExport)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] text-[#EAEEBB] border border-[#453D37] ${
+                  !isExpanded ? 'justify-center px-0' : ''
+                }`}
+                title="Ekspor PDF Format Resmi (Khusus Super Admin)"
+              >
+                <FileText className="w-4 h-4 shrink-0 text-[#EAEEBB]" />
+                {isExpanded && (
+                  <div className="text-left flex-1 truncate">
+                    <p className="leading-tight truncate">Ekspor PDF Resmi</p>
+                    <p className="text-[10px] text-[#70635A] font-normal truncate">Format Cetak Laporan</p>
+                  </div>
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Section 3: Cloud & Super Admin Controls - ONLY Accessible to Super Admin */}
+          {isSuperAdmin && (
+            <div className="space-y-1 pt-2 border-t border-[#3D352F]">
+              {isExpanded && (
+                <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#FFBC7D]">
+                  Kontrol Super Admin
+                </p>
+              )}
+
+              {/* Cloud Sync Status Button */}
+              <button
+                onClick={() => handleActionClick(onOpenCloudSync)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] border border-[#453D37] text-[#D9DF98] ${
+                  !isExpanded ? 'justify-center px-0' : ''
+                }`}
+                title="Pengaturan Google Drive & Cloud Sync"
+              >
+                {syncState.isOnline ? (
+                  syncState.isSyncing ? (
+                    <RefreshCw className="w-4 h-4 text-[#FFBC7D] animate-spin shrink-0" />
+                  ) : syncState.pendingCount > 0 ? (
+                    <Cloud className="w-4 h-4 text-[#FFBC7D] shrink-0" />
+                  ) : (
+                    <CheckCircle2 className="w-4 h-4 text-[#95A823] shrink-0" />
+                  )
+                ) : (
+                  <CloudOff className="w-4 h-4 text-rose-400 shrink-0" />
+                )}
+                {isExpanded && (
+                  <div className="text-left flex-1 truncate">
+                    <p className="leading-tight truncate">Sinkronisasi Cloud</p>
+                    <p className="text-[10px] text-[#70635A] font-normal truncate">
+                      {syncState.isSyncing ? 'Menyinkronkan...' : 'Google Drive & Firestore'}
+                    </p>
+                  </div>
+                )}
+              </button>
+
+              {/* Super Admin Control Center */}
+              <button
+                onClick={() => handleActionClick(onOpenSuperAdmin)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
+                  isSuperAdminAuth
+                    ? 'bg-[#FFBC7D]/20 text-[#FFBC7D] border-[#FFBC7D]/60 hover:bg-[#FFBC7D]/30'
+                    : 'bg-[#2E2824] text-[#D9DF98] border-[#453D37] hover:text-[#FFBC7D]'
+                } ${!isExpanded ? 'justify-center px-0' : ''}`}
+                title="Super Admin Backend Control Center"
+              >
+                <KeyRound className="w-4 h-4 text-[#FFBC7D] shrink-0" />
+                {isExpanded && (
+                  <div className="text-left flex-1 truncate">
+                    <p className="leading-tight truncate text-[#FFBC7D]">Super Admin Panel</p>
+                    <p className="text-[10px] text-[#FFBC7D]/70 font-normal truncate">Hak Akses, User &amp; Backup</p>
+                  </div>
+                )}
+              </button>
+            </div>
+          )}
+
+          {/* Non-admin notice when expanded */}
+          {!isSuperAdmin && isExpanded && (
+            <div className="p-2.5 rounded-2xl bg-[#2A2420] border border-[#3D352F] text-[10px] text-[#A89E96] space-y-1">
+              <p className="font-bold text-[#EAEEBB] flex items-center gap-1">
+                <ShieldAlert className="w-3.5 h-3.5 text-[#95A823]" />
+                Mode Petugas MOD
+              </p>
+              <p className="leading-relaxed">
+                Anda hanya memiliki izin untuk input data inspeksi MOD dan melihat dasbor visual. Fitur administrasi lainnya hanya dapat diakses oleh Super Admin.
+              </p>
+            </div>
+          )}
         </div>
-      </div>
-    </header>
+
+        {/* Bottom Section: User Profile & Logout */}
+        <div className="p-3 border-t border-[#3D352F] bg-[#1E1917] space-y-2">
+          {/* User Profile Card */}
+          <div 
+            onClick={() => handleActionClick(onOpenAuth)}
+            className={`flex items-center gap-2.5 p-1.5 rounded-2xl bg-[#28211D] hover:bg-[#342C27] border border-[#453D37] transition cursor-pointer ${
+              !isExpanded ? 'justify-center p-1' : ''
+            }`}
+            title={`Petugas: ${currentUser.name} (${currentUser.role})`}
+          >
+            <div className="relative shrink-0">
+              <img
+                src={currentUser.avatar}
+                alt={currentUser.name}
+                className="w-9 h-9 rounded-xl object-cover border-2 border-[#95A823]"
+              />
+              <span className="w-2.5 h-2.5 rounded-full bg-[#95A823] border-2 border-[#1E1917] absolute -bottom-0.5 -right-0.5"></span>
+            </div>
+
+            {isExpanded && (
+              <div className="text-left flex-1 min-w-0">
+                <p className="text-xs font-bold text-white truncate">
+                  {currentUser.name}
+                </p>
+                <p className="text-[10px] text-[#C6CC81] truncate font-medium">
+                  {currentUser.role} &bull; {currentUser.department}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Logout Button */}
+          {onLogout && (
+            <button
+              onClick={() => handleActionClick(onLogout)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-xs font-semibold bg-[#28211D] hover:bg-[#C25941]/20 text-[#D9DF98] hover:text-[#FFBC7D] border border-[#453D37] hover:border-[#C25941]/60 transition ${
+                !isExpanded ? 'justify-center px-0' : ''
+              }`}
+              title="Keluar / Logout dari Sistem"
+            >
+              <LogOut className="w-3.5 h-3.5 text-[#FFBC7D] shrink-0" />
+              {isExpanded && <span className="truncate">Keluar Sistem</span>}
+            </button>
+          )}
+
+          {/* Autohide Hint Footer */}
+          {isExpanded && (
+            <div className="text-[9px] text-[#70635A] text-center pt-1 font-medium hidden lg:block">
+              {isPinned ? '📌 Sidebar Tersemat' : '🔓 Mode Autohide Aktif'}
+            </div>
+          )}
+        </div>
+      </aside>
+    </>
   );
 };

@@ -223,6 +223,28 @@ export async function deleteReportFromFirestore(reportId: string): Promise<void>
 }
 
 /**
+ * Clear all reports from Firestore
+ */
+export async function clearAllReportsFromFirestore(): Promise<number> {
+  const path = 'reports';
+  try {
+    const snap = await getDocs(collection(db, path));
+    if (snap.empty) return 0;
+    const batch = writeBatch(db);
+    let count = 0;
+    snap.docs.forEach((docSnap) => {
+      batch.delete(docSnap.ref);
+      count++;
+    });
+    await batch.commit();
+    return count;
+  } catch (error) {
+    handleFirestoreError(error, OperationType.DELETE, path);
+    return 0;
+  }
+}
+
+/**
  * Real-time listener for Users and Permissions collection
  */
 export function subscribeToFirestoreUsers(

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
   ShieldCheck, 
   Users, 
@@ -24,17 +24,18 @@ import {
   Phone, 
   Mail, 
   Check, 
-  X,
-  FileCheck,
-  Server,
-  Eye,
-  EyeOff,
-  Sparkles,
-  ExternalLink,
-  Copy,
-  CheckCheck,
-  FolderOpen,
-  Info
+  X, 
+  FileCheck, 
+  Server, 
+  Eye, 
+  EyeOff, 
+  Sparkles, 
+  ExternalLink, 
+  Copy, 
+  CheckCheck, 
+  FolderOpen, 
+  Info,
+  Camera
 } from 'lucide-react';
 import { 
   UserProfile, 
@@ -66,7 +67,7 @@ import {
   restoreSystemFromBackup,
   factoryResetSystem
 } from '../../services/systemSettingsService';
-import { formatBytes } from '../../services/imageCompressionService';
+import { formatBytes, compressImage } from '../../services/imageCompressionService';
 import { calculateStorageSavings, saveReports } from '../../services/storageService';
 import { 
   extractDriveFolderId, 
@@ -136,6 +137,30 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   // Notification toast
   const [toast, setToast] = useState<string | null>(null);
+
+  // Avatar upload ref from device
+  const adminAvatarInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingAdminAvatar, setIsUploadingAdminAvatar] = useState(false);
+
+  const handleAdminAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      alert('Mohon pilih file gambar yang valid (JPG, PNG, WEBP).');
+      return;
+    }
+    setIsUploadingAdminAvatar(true);
+    try {
+      const compressed = await compressImage(file, 400, 400, 0.82);
+      setFormAvatar(compressed.dataUrl);
+      showToast(`Foto profil berhasil diunggah dari perangkat (${formatBytes(compressed.compressedSizeBytes)})!`);
+    } catch (err: any) {
+      alert('Gagal memproses gambar: ' + (err.message || 'Error'));
+    } finally {
+      setIsUploadingAdminAvatar(false);
+      if (adminAvatarInputRef.current) adminAvatarInputRef.current.value = '';
+    }
+  };
 
   const showToast = (msg: string) => {
     setToast(msg);
@@ -1541,14 +1566,67 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 </div>
               </div>
 
-              <div>
-                <label className="block text-slate-300 font-semibold mb-1">URL Foto Profil (Avatar)</label>
+              <div className="space-y-2">
+                <label className="block text-slate-300 font-semibold text-xs">
+                  Foto Profil (Avatar) Pengguna
+                </label>
+                
+                <div className="flex items-center gap-3 p-3 bg-slate-900 border border-slate-700/80 rounded-2xl">
+                  {/* Avatar Preview */}
+                  <div className="relative shrink-0">
+                    <img
+                      src={formAvatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'}
+                      alt="Preview"
+                      className="w-14 h-14 rounded-2xl object-cover border-2 border-amber-500/60 bg-slate-950 shadow-xs"
+                    />
+                    {isUploadingAdminAvatar && (
+                      <div className="absolute inset-0 rounded-2xl bg-black/60 flex items-center justify-center">
+                        <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Upload from Device Controls */}
+                  <div className="flex-1 space-y-1.5">
+                    <input
+                      type="file"
+                      ref={adminAvatarInputRef}
+                      onChange={handleAdminAvatarUpload}
+                      accept="image/*"
+                      className="hidden"
+                    />
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => adminAvatarInputRef.current?.click()}
+                        disabled={isUploadingAdminAvatar}
+                        className="px-3 py-1.5 bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 rounded-xl text-xs font-bold transition flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Camera className="w-3.5 h-3.5" />
+                        <span>{isUploadingAdminAvatar ? 'Mengunggah...' : 'Unggah dari Device'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setFormAvatar('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80')}
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl text-xs transition cursor-pointer"
+                        title="Gunakan avatar default"
+                      >
+                        Reset
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Pilih file foto dari galeri / kamera HP atau masukkan tautan URL di bawah.
+                    </p>
+                  </div>
+                </div>
+
                 <input
                   type="text"
                   value={formAvatar}
                   onChange={(e) => setFormAvatar(e.target.value)}
-                  placeholder="https://images.unsplash.com/..."
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-[11px]"
+                  placeholder="Atau tempel URL gambar (https://...)"
+                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-white font-mono text-[11px] focus:outline-none focus:border-amber-500"
                 />
               </div>
 

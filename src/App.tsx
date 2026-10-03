@@ -529,6 +529,12 @@ export default function App() {
         onClose={() => setIsAuthOpen(false)}
         currentUser={currentUser}
         onLogout={handleLogout}
+        onUpdateUser={(updated) => {
+          setCurrentUser(updated);
+          setSessionUser(updated);
+          saveStoredUser(updated);
+          showToast('Foto profil berhasil diperbarui!');
+        }}
       />
 
       <SuperAdminLoginModal

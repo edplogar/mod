@@ -21,14 +21,16 @@ import {
   ChevronRight,
   ShieldAlert
 } from 'lucide-react';
-import { UserProfile, CloudSyncState } from '../types';
+import type { UserProfile, CloudSyncState, RolePermissionConfig } from '../types/index.ts';
 import { LogarLogo } from './LogarLogo';
+import { getUserPermissions } from '../services/permissionService.ts';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'reports';
   setActiveTab: (tab: 'dashboard' | 'reports') => void;
   currentUser: UserProfile;
   syncState: CloudSyncState;
+  userPermissions?: RolePermissionConfig;
   onTriggerSync: () => void;
   onOpenNewReport: () => void;
   onOpenPdfExport: () => void;
@@ -44,6 +46,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   setActiveTab,
   currentUser,
   syncState,
+  userPermissions,
   onTriggerSync,
   onOpenNewReport,
   onOpenPdfExport,
@@ -61,8 +64,11 @@ export const Navbar: React.FC<NavbarProps> = ({
   // Computed state: sidebar expands on hover, when pinned, or when opened on mobile
   const isExpanded = isPinned || isHovered || isMobileOpen;
 
-  // Strict RBAC: Check if current user is Super Admin
-  const isSuperAdmin = currentUser.role === 'Super Admin' || isSuperAdminAuth;
+  // Permissions resolved from RBAC system
+  const perms = userPermissions || getUserPermissions(currentUser);
+
+  // Strict RBAC: Check if current user has Super Admin authority
+  const isSuperAdmin = currentUser.role === 'Super Admin' || isSuperAdminAuth || perms.canAccessSuperAdmin;
 
   const handleTabChange = (tab: 'dashboard' | 'reports') => {
     setActiveTab(tab);
@@ -91,13 +97,15 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         <div className="flex items-center gap-2">
           {/* Quick Input MOD button on mobile */}
-          <button
-            onClick={onOpenNewReport}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#95A823] hover:bg-[#83941F] text-white shadow-sm transition"
-          >
-            <PlusCircle className="w-4 h-4" />
-            <span>Input</span>
-          </button>
+          {perms.canCreateReport && (
+            <button
+              onClick={onOpenNewReport}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-[#95A823] hover:bg-[#83941F] text-white shadow-sm transition"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>Input</span>
+            </button>
+          )}
 
           {/* User Avatar */}
           <button
@@ -196,10 +204,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             }`}>
               <span className="flex items-center gap-1.5 truncate">
                 {isSuperAdmin ? <ShieldCheck className="w-3 h-3 text-[#FFBC7D]" /> : <User className="w-3 h-3 text-[#95A823]" />}
-                <span className="truncate">{isSuperAdmin ? 'Role: Super Administrator' : 'Role: Petugas MOD Officer'}</span>
+                <span className="truncate">Role: {currentUser.role}</span>
               </span>
               <span className="text-[9px] opacity-75">
-                {isSuperAdmin ? 'Akses Penuh' : 'Akses Khusus'}
+                {isSuperAdmin ? 'Akses Penuh' : 'Akses Terotorisasi'}
               </span>
             </div>
           )}
@@ -215,27 +223,29 @@ export const Navbar: React.FC<NavbarProps> = ({
               </p>
             )}
 
-            {/* 1. Dasbor Visual - Accessible to BOTH MOD Officer & Super Admin */}
-            <button
-              onClick={() => handleTabChange('dashboard')}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
-                activeTab === 'dashboard'
-                  ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
-                  : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
-              } ${!isExpanded ? 'justify-center px-0' : ''}`}
-              title="Dasbor Visual & Statistik"
-            >
-              <BarChart3 className="w-4 h-4 shrink-0" />
-              {isExpanded && (
-                <div className="text-left flex-1 truncate">
-                  <p className="leading-tight truncate">Dasbor Visual</p>
-                  <p className="text-[10px] opacity-80 font-normal truncate">Statistik &amp; Grafik Temuan</p>
-                </div>
-              )}
-            </button>
+            {/* 1. Dasbor Visual */}
+            {perms.canAccessDashboard && (
+              <button
+                onClick={() => handleTabChange('dashboard')}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
+                  activeTab === 'dashboard'
+                    ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
+                    : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
+                } ${!isExpanded ? 'justify-center px-0' : ''}`}
+                title="Dasbor Visual & Statistik"
+              >
+                <BarChart3 className="w-4 h-4 shrink-0" />
+                {isExpanded && (
+                  <div className="text-left flex-1 truncate">
+                    <p className="leading-tight truncate">Dasbor Visual</p>
+                    <p className="text-[10px] opacity-80 font-normal truncate">Statistik &amp; Grafik Temuan</p>
+                  </div>
+                )}
+              </button>
+            )}
 
-            {/* 2. Data Laporan (ReportListView) - ONLY Accessible to Super Admin */}
-            {isSuperAdmin && (
+            {/* 2. Data Laporan (ReportListView) */}
+            {perms.canAccessReports && (
               <button
                 onClick={() => handleTabChange('reports')}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all ${
@@ -243,7 +253,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30'
                     : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
                 } ${!isExpanded ? 'justify-center px-0' : ''}`}
-                title="Data Riwayat Laporan (Khusus Super Admin)"
+                title="Data Riwayat Laporan Lengkap"
               >
                 <ListFilter className="w-4 h-4 shrink-0" />
                 {isExpanded && (
@@ -252,7 +262,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     <p className="text-[10px] opacity-80 font-normal truncate">Riwayat &amp; Filter Inspeksi</p>
                   </div>
                 )}
-                {isExpanded && (
+                {isExpanded && isSuperAdmin && (
                   <span className="text-[9px] bg-[#231E1B] text-[#EAEEBB] px-1.5 py-0.5 rounded font-mono font-bold">
                     Admin
                   </span>
@@ -262,106 +272,114 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
 
           {/* Section 2: Input & Actions */}
-          <div className="space-y-1 pt-2 border-t border-[#3D352F]">
-            {isExpanded && (
-              <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#877465]">
-                Tindakan Petugas
-              </p>
-            )}
-
-            {/* 3. Input Laporan MOD - Accessible to BOTH MOD Officer & Super Admin */}
-            <button
-              onClick={() => handleActionClick(onOpenNewReport)}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-black transition-all bg-[#95A823] hover:bg-[#83941F] text-white shadow-md shadow-[#95A823]/25 transform hover:-translate-y-0.5 ${
-                !isExpanded ? 'justify-center px-0' : ''
-              }`}
-              title="Input Laporan Inspeksi Baru"
-            >
-              <PlusCircle className="w-4 h-4 shrink-0 text-white" />
+          {(perms.canCreateReport || perms.canExportPdf) && (
+            <div className="space-y-1 pt-2 border-t border-[#3D352F]">
               {isExpanded && (
-                <div className="text-left flex-1 truncate">
-                  <p className="leading-tight truncate">+ Input Data MOD</p>
-                  <p className="text-[10px] opacity-85 font-normal truncate">Patroli &amp; Temuan Baru</p>
-                </div>
+                <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#877465]">
+                  Tindakan Operasional
+                </p>
               )}
-            </button>
 
-            {/* 4. Ekspor PDF - ONLY Accessible to Super Admin */}
-            {isSuperAdmin && (
-              <button
-                onClick={() => handleActionClick(onOpenPdfExport)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] text-[#EAEEBB] border border-[#453D37] ${
-                  !isExpanded ? 'justify-center px-0' : ''
-                }`}
-                title="Ekspor PDF Format Resmi (Khusus Super Admin)"
-              >
-                <FileText className="w-4 h-4 shrink-0 text-[#EAEEBB]" />
-                {isExpanded && (
-                  <div className="text-left flex-1 truncate">
-                    <p className="leading-tight truncate">Ekspor PDF Resmi</p>
-                    <p className="text-[10px] text-[#70635A] font-normal truncate">Format Cetak Laporan</p>
-                  </div>
-                )}
-              </button>
-            )}
-          </div>
+              {/* 3. Input Laporan MOD */}
+              {perms.canCreateReport && (
+                <button
+                  onClick={() => handleActionClick(onOpenNewReport)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-black transition-all bg-[#95A823] hover:bg-[#83941F] text-white shadow-md shadow-[#95A823]/25 transform hover:-translate-y-0.5 ${
+                    !isExpanded ? 'justify-center px-0' : ''
+                  }`}
+                  title="Input Laporan Inspeksi Baru"
+                >
+                  <PlusCircle className="w-4 h-4 shrink-0 text-white" />
+                  {isExpanded && (
+                    <div className="text-left flex-1 truncate">
+                      <p className="leading-tight truncate">+ Input Data MOD</p>
+                      <p className="text-[10px] opacity-85 font-normal truncate">Patroli &amp; Temuan Baru</p>
+                    </div>
+                  )}
+                </button>
+              )}
 
-          {/* Section 3: Cloud & Super Admin Controls - ONLY Accessible to Super Admin */}
-          {isSuperAdmin && (
+              {/* 4. Ekspor PDF */}
+              {perms.canExportPdf && (
+                <button
+                  onClick={() => handleActionClick(onOpenPdfExport)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] text-[#EAEEBB] border border-[#453D37] ${
+                    !isExpanded ? 'justify-center px-0' : ''
+                  }`}
+                  title="Ekspor PDF Format Resmi LOGAR"
+                >
+                  <FileText className="w-4 h-4 shrink-0 text-[#EAEEBB]" />
+                  {isExpanded && (
+                    <div className="text-left flex-1 truncate">
+                      <p className="leading-tight truncate">Ekspor PDF Resmi</p>
+                      <p className="text-[10px] text-[#70635A] font-normal truncate">Format Cetak Laporan</p>
+                    </div>
+                  )}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Section 3: Cloud & Super Admin Controls */}
+          {(perms.canSyncCloud || perms.canAccessSuperAdmin) && (
             <div className="space-y-1 pt-2 border-t border-[#3D352F]">
               {isExpanded && (
                 <p className="px-2.5 text-[9px] font-black uppercase tracking-wider text-[#FFBC7D]">
-                  Kontrol Super Admin
+                  Administrasi &amp; Cloud
                 </p>
               )}
 
               {/* Cloud Sync Status Button */}
-              <button
-                onClick={() => handleActionClick(onOpenCloudSync)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] border border-[#453D37] text-[#D9DF98] ${
-                  !isExpanded ? 'justify-center px-0' : ''
-                }`}
-                title="Pengaturan Google Drive & Cloud Sync"
-              >
-                {syncState.isOnline ? (
-                  syncState.isSyncing ? (
-                    <RefreshCw className="w-4 h-4 text-[#FFBC7D] animate-spin shrink-0" />
-                  ) : syncState.pendingCount > 0 ? (
-                    <Cloud className="w-4 h-4 text-[#FFBC7D] shrink-0" />
+              {perms.canSyncCloud && (
+                <button
+                  onClick={() => handleActionClick(onOpenCloudSync)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] border border-[#453D37] text-[#D9DF98] ${
+                    !isExpanded ? 'justify-center px-0' : ''
+                  }`}
+                  title="Pengaturan Google Drive & Cloud Sync"
+                >
+                  {syncState.isOnline ? (
+                    syncState.isSyncing ? (
+                      <RefreshCw className="w-4 h-4 text-[#FFBC7D] animate-spin shrink-0" />
+                    ) : syncState.pendingCount > 0 ? (
+                      <Cloud className="w-4 h-4 text-[#FFBC7D] shrink-0" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-[#95A823] shrink-0" />
+                    )
                   ) : (
-                    <CheckCircle2 className="w-4 h-4 text-[#95A823] shrink-0" />
-                  )
-                ) : (
-                  <CloudOff className="w-4 h-4 text-rose-400 shrink-0" />
-                )}
-                {isExpanded && (
-                  <div className="text-left flex-1 truncate">
-                    <p className="leading-tight truncate">Sinkronisasi Cloud</p>
-                    <p className="text-[10px] text-[#70635A] font-normal truncate">
-                      {syncState.isSyncing ? 'Menyinkronkan...' : 'Google Drive & Firestore'}
-                    </p>
-                  </div>
-                )}
-              </button>
+                    <CloudOff className="w-4 h-4 text-rose-400 shrink-0" />
+                  )}
+                  {isExpanded && (
+                    <div className="text-left flex-1 truncate">
+                      <p className="leading-tight truncate">Sinkronisasi Cloud</p>
+                      <p className="text-[10px] text-[#70635A] font-normal truncate">
+                        {syncState.isSyncing ? 'Menyinkronkan...' : 'Google Drive & Firestore'}
+                      </p>
+                    </div>
+                  )}
+                </button>
+              )}
 
               {/* Super Admin Control Center */}
-              <button
-                onClick={() => handleActionClick(onOpenSuperAdmin)}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
-                  isSuperAdminAuth
-                    ? 'bg-[#FFBC7D]/20 text-[#FFBC7D] border-[#FFBC7D]/60 hover:bg-[#FFBC7D]/30'
-                    : 'bg-[#2E2824] text-[#D9DF98] border-[#453D37] hover:text-[#FFBC7D]'
-                } ${!isExpanded ? 'justify-center px-0' : ''}`}
-                title="Super Admin Backend Control Center"
-              >
-                <KeyRound className="w-4 h-4 text-[#FFBC7D] shrink-0" />
-                {isExpanded && (
-                  <div className="text-left flex-1 truncate">
-                    <p className="leading-tight truncate text-[#FFBC7D]">Super Admin Panel</p>
-                    <p className="text-[10px] text-[#FFBC7D]/70 font-normal truncate">Hak Akses, User &amp; Backup</p>
-                  </div>
-                )}
-              </button>
+              {perms.canAccessSuperAdmin && (
+                <button
+                  onClick={() => handleActionClick(onOpenSuperAdmin)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all border ${
+                    isSuperAdminAuth
+                      ? 'bg-[#FFBC7D]/20 text-[#FFBC7D] border-[#FFBC7D]/60 hover:bg-[#FFBC7D]/30'
+                      : 'bg-[#2E2824] text-[#D9DF98] border-[#453D37] hover:text-[#FFBC7D]'
+                  } ${!isExpanded ? 'justify-center px-0' : ''}`}
+                  title="Super Admin Backend Control Center"
+                >
+                  <KeyRound className="w-4 h-4 text-[#FFBC7D] shrink-0" />
+                  {isExpanded && (
+                    <div className="text-left flex-1 truncate">
+                      <p className="leading-tight truncate text-[#FFBC7D]">Super Admin Panel</p>
+                      <p className="text-[10px] text-[#FFBC7D]/70 font-normal truncate">Hak Akses, User &amp; Backup</p>
+                    </div>
+                  )}
+                </button>
+              )}
             </div>
           )}
 
@@ -370,10 +388,10 @@ export const Navbar: React.FC<NavbarProps> = ({
             <div className="p-2.5 rounded-2xl bg-[#2A2420] border border-[#3D352F] text-[10px] text-[#A89E96] space-y-1">
               <p className="font-bold text-[#EAEEBB] flex items-center gap-1">
                 <ShieldAlert className="w-3.5 h-3.5 text-[#95A823]" />
-                Mode Petugas MOD
+                <span>Hak Akses: {currentUser.role}</span>
               </p>
               <p className="leading-relaxed">
-                Anda hanya memiliki izin untuk input data inspeksi MOD dan melihat dasbor visual. Fitur administrasi lainnya hanya dapat diakses oleh Super Admin.
+                Menu dan fitur yang aktif disesuaikan oleh Super Administrator berdasarkan wewenang peran jabatan Anda.
               </p>
             </div>
           )}

@@ -125,3 +125,24 @@ export interface CloudSyncState {
   driveFolderId: string;
   driveWebhookUrl?: string;
 }
+
+export interface RolePermissionConfig {
+  role: UserRole;
+  displayName: string;
+  description: string;
+  canAccessDashboard: boolean;
+  canAccessReports: boolean;
+  canCreateReport: boolean;
+  canExportPdf: boolean;
+  canSyncCloud: boolean;
+  canEditReportStatus: boolean;
+  canDeleteReport: boolean;
+  canAccessSuperAdmin: boolean;
+}
+
+export interface SystemPermissionsState {
+  roles: Record<UserRole, RolePermissionConfig>;
+  userOverrides?: Record<string, Partial<RolePermissionConfig>>;
+  updatedAt?: string;
+  updatedBy?: string;
+}

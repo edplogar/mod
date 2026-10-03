@@ -37,15 +37,22 @@ import {
   Info,
   Camera
 } from 'lucide-react';
-import { 
+import type { 
   UserProfile, 
   UserRole, 
   Department, 
   SystemSettings, 
   SystemAuditLog, 
   ModReportItem,
-  HotelLocationConfig
-} from '../../types';
+  HotelLocationConfig,
+  SystemPermissionsState
+} from '../../types/index.ts';
+import { RolePermissionsManager } from './RolePermissionsManager.tsx';
+import { 
+  getStoredPermissions, 
+  subscribeToFirestorePermissions, 
+  syncPermissionsToFirestore 
+} from '../../services/permissionService.ts';
 import { 
   getAllUsers, 
   addUser, 
@@ -82,7 +89,7 @@ interface SuperAdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = 'overview' | 'users' | 'parameters' | 'locations' | 'audit' | 'backup';
+type AdminTab = 'overview' | 'users' | 'permissions' | 'parameters' | 'locations' | 'audit' | 'backup';
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onBackToApp,
@@ -90,6 +97,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onRefreshData,
 }) => {
   const [activeTab, setActiveTab] = useState<AdminTab>('users');
+  const [permissions, setPermissions] = useState<SystemPermissionsState>(getStoredPermissions());
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [settings, setSettings] = useState<SystemSettings>(getSystemSettings());
   const [auditLogs, setAuditLogs] = useState<SystemAuditLog[]>([]);
@@ -184,13 +192,25 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
     const handleSettingsUpdated = () => {
       setSettings(getSystemSettings());
     };
+    const handlePermsUpdated = (e: any) => {
+      if (e.detail) {
+        setPermissions(e.detail);
+      }
+    };
 
     window.addEventListener('logar_users_updated', handleUsersUpdated);
     window.addEventListener('logar_settings_updated', handleSettingsUpdated);
+    window.addEventListener('logar_permissions_updated', handlePermsUpdated);
+
+    const unsubPerms = subscribeToFirestorePermissions((newPerms) => {
+      setPermissions(newPerms);
+    });
 
     return () => {
       window.removeEventListener('logar_users_updated', handleUsersUpdated);
       window.removeEventListener('logar_settings_updated', handleSettingsUpdated);
+      window.removeEventListener('logar_permissions_updated', handlePermsUpdated);
+      unsubPerms();
     };
   }, []);
 
@@ -591,6 +611,23 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('permissions')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'permissions'
+                ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30 font-bold'
+                : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <KeyRound className="w-4 h-4 text-[#EAEEBB]" />
+              <span>Hak Akses &amp; Peran Menu</span>
+            </div>
+            <span className="text-[10px] bg-[#95A823]/25 text-[#EAEEBB] border border-[#95A823]/40 px-1.5 py-0.5 rounded font-mono font-bold">
+              RBAC
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('parameters')}
             className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
               activeTab === 'parameters'
@@ -668,7 +705,59 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         </aside>
 
         {/* Content Area */}
-        <main className="flex-1 bg-[#231E1B] border border-[#3D352F] rounded-3xl p-6 min-h-[600px] overflow-y-auto">
+        <main className="flex-1 bg-[#231E1B] border border-[#3D352F] rounded-3xl p-4 sm:p-6 min-h-[600px] overflow-y-auto">
+          {/* Mobile Horizontal Navigation Tabs */}
+          <div className="md:hidden flex items-center gap-1.5 overflow-x-auto pb-3 mb-4 border-b border-[#3D352F] shrink-0">
+            <button
+              onClick={() => setActiveTab('users')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'users' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Petugas ({users.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('permissions')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'permissions' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Hak Akses Menu (RBAC)
+            </button>
+            <button
+              onClick={() => setActiveTab('parameters')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'parameters' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Parameter
+            </button>
+            <button
+              onClick={() => setActiveTab('locations')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'locations' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Lokasi ({settings.locations.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('audit')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'audit' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Audit Log
+            </button>
+            <button
+              onClick={() => setActiveTab('backup')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'backup' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Cadangan
+            </button>
+          </div>
+
           {/* TAB 1: USER MANAGEMENT */}
           {activeTab === 'users' && (
             <div className="space-y-6">
@@ -852,6 +941,21 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* TAB: ROLE & MENU PERMISSIONS (RBAC) */}
+          {activeTab === 'permissions' && (
+            <div className="space-y-6">
+              <RolePermissionsManager
+                permissions={permissions}
+                onUpdatePermissions={(newPerms) => {
+                  setPermissions(newPerms);
+                  addAuditLog('PERMISSION_UPDATED', 'Super Admin memperbarui konfigurasi peran & hak akses menu (RBAC)', 'SECURITY');
+                }}
+                users={users}
+                onShowToast={showToast}
+              />
             </div>
           )}
 

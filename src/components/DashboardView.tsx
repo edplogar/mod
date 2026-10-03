@@ -13,10 +13,12 @@ import {
   Filler,
 } from 'chart.js';
 import { Line, Bar, Doughnut, Pie } from 'react-chartjs-2';
-import { 
+import type { 
   ModReportItem, 
-  UserProfile 
-} from '../types';
+  UserProfile,
+  RolePermissionConfig
+} from '../types/index.ts';
+import { getUserPermissions } from '../services/permissionService.ts';
 import { 
   calculateStorageSavings 
 } from '../services/storageService';
@@ -53,6 +55,7 @@ ChartJS.register(
 interface DashboardViewProps {
   reports: ModReportItem[];
   currentUser: UserProfile;
+  userPermissions?: RolePermissionConfig;
   onNavigateToReports: (filterStatus?: string) => void;
   onOpenNewReport: () => void;
 }
@@ -60,9 +63,11 @@ interface DashboardViewProps {
 export const DashboardView: React.FC<DashboardViewProps> = ({
   reports,
   currentUser,
+  userPermissions,
   onNavigateToReports,
   onOpenNewReport,
 }) => {
+  const perms = userPermissions || getUserPermissions(currentUser);
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
   // Filtered reports by month if selected
@@ -312,12 +317,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </select>
           </div>
 
-          <button
-            onClick={onOpenNewReport}
-            className="px-4 py-2 bg-[#95A823] hover:bg-[#83941F] text-white font-bold text-xs rounded-2xl shadow-md shadow-[#95A823]/25 transition flex items-center gap-1.5"
-          >
-            <span>+ Input Baru</span>
-          </button>
+          {perms.canCreateReport && (
+            <button
+              onClick={onOpenNewReport}
+              className="px-4 py-2 bg-[#95A823] hover:bg-[#83941F] text-white font-bold text-xs rounded-2xl shadow-md shadow-[#95A823]/25 transition flex items-center gap-1.5 cursor-pointer"
+            >
+              <span>+ Input Baru</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -326,12 +333,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* KPI 1: Total Inspeksi */}
         <div 
           onClick={() => {
-            if (currentUser.role === 'Super Admin') {
+            if (perms.canAccessReports) {
               onNavigateToReports();
             }
           }}
           className={`bg-white rounded-3xl p-5 border border-[#E2E7B8] shadow-xs transition group ${
-            currentUser.role === 'Super Admin' 
+            perms.canAccessReports 
               ? 'hover:border-[#95A823] hover:shadow-md cursor-pointer' 
               : ''
           }`}
@@ -350,7 +357,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>Rata-rata 4-8 titik per shift</span>
-            {currentUser.role === 'Super Admin' ? (
+            {perms.canAccessReports ? (
               <span className="text-[#95A823] font-bold flex items-center gap-0.5">
                 Lihat data <ArrowRight className="w-3 h-3" />
               </span>
@@ -363,12 +370,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* KPI 2: Kondisi Aman */}
         <div 
           onClick={() => {
-            if (currentUser.role === 'Super Admin') {
+            if (perms.canAccessReports) {
               onNavigateToReports('Aman');
             }
           }}
           className={`bg-white rounded-3xl p-5 border border-[#C6CC81] shadow-xs transition group ${
-            currentUser.role === 'Super Admin' 
+            perms.canAccessReports 
               ? 'hover:border-[#95A823] hover:shadow-md cursor-pointer' 
               : ''
           }`}
@@ -389,7 +396,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>Sikon operasional standar</span>
-            {currentUser.role === 'Super Admin' ? (
+            {perms.canAccessReports ? (
               <span className="text-[#95A823] font-bold flex items-center gap-0.5">
                 Filter aman <ArrowRight className="w-3 h-3" />
               </span>
@@ -402,12 +409,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         {/* KPI 3: Temuan / Perlu Follow Up */}
         <div 
           onClick={() => {
-            if (currentUser.role === 'Super Admin') {
+            if (perms.canAccessReports) {
               onNavigateToReports('Perlu Follow Up');
             }
           }}
           className={`bg-white rounded-3xl p-5 border border-[#F2D7D0] shadow-xs transition group ${
-            currentUser.role === 'Super Admin' 
+            perms.canAccessReports 
               ? 'hover:border-[#C25941] hover:shadow-md cursor-pointer' 
               : ''
           }`}
@@ -428,7 +435,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
             <span>HK &amp; Engineering Terbanyak</span>
-            {currentUser.role === 'Super Admin' ? (
+            {perms.canAccessReports ? (
               <span className="text-[#C25941] font-bold flex items-center gap-0.5">
                 Tindak lanjut <ArrowRight className="w-3 h-3" />
               </span>

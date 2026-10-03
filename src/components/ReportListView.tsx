@@ -4,7 +4,8 @@ import {
   Department, 
   ReportStatus, 
   UserProfile,
-  PictureItem
+  PictureItem,
+  RolePermissionConfig
 } from '../types';
 import { 
   Search, 
@@ -19,25 +20,28 @@ import {
   User, 
   MapPin, 
   Eye, 
-  X,
-  FileDown,
-  Layers,
-  Sparkles,
-  FolderOpen,
-  Download,
-  HardDrive,
-  RotateCcw,
-  FileText
+  X, 
+  FileDown, 
+  Layers, 
+  Sparkles, 
+  FolderOpen, 
+  Download, 
+  HardDrive, 
+  RotateCcw, 
+  FileText,
+  Lock
 } from 'lucide-react';
 import { formatBytes } from '../services/imageCompressionService';
 import { getDriveFolderUrl } from '../services/driveSyncService';
 import { getSystemSettings } from '../services/systemSettingsService';
+import { getUserPermissions } from '../services/permissionService';
 
 export type SearchScope = 'all' | 'location' | 'officer' | 'description';
 
 interface ReportListViewProps {
   reports: ModReportItem[];
   currentUser: UserProfile;
+  userPermissions?: RolePermissionConfig;
   onUpdateStatus: (reportId: string, newStatus: ReportStatus) => void;
   onDeleteReport: (reportId: string) => void;
   onOpenPdfExport: () => void;
@@ -48,12 +52,14 @@ interface ReportListViewProps {
 export const ReportListView: React.FC<ReportListViewProps> = ({
   reports,
   currentUser,
+  userPermissions,
   onUpdateStatus,
   onDeleteReport,
   onOpenPdfExport,
   onClearAllReports,
   initialFilterStatus = 'all',
 }) => {
+  const perms = userPermissions || getUserPermissions(currentUser);
   const [searchTerm, setSearchTerm] = useState('');
   const [searchScope, setSearchScope] = useState<SearchScope>('all');
   const [selectedDept, setSelectedDept] = useState<string>('all');
@@ -239,13 +245,15 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
               </button>
             )}
 
-            <button
-              onClick={onOpenPdfExport}
-              className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#877465] hover:bg-[#70635A] text-white rounded-xl text-xs font-bold shadow-xs transition"
-            >
-              <FileDown className="w-4 h-4 text-[#EAEEBB]" />
-              <span>Ekspor PDF Format Resmi</span>
-            </button>
+            {perms.canExportPdf && (
+              <button
+                onClick={onOpenPdfExport}
+                className="flex items-center gap-1.5 px-3.5 py-1.5 bg-[#877465] hover:bg-[#70635A] text-white rounded-xl text-xs font-bold shadow-xs transition"
+              >
+                <FileDown className="w-4 h-4 text-[#EAEEBB]" />
+                <span>Ekspor PDF Format Resmi</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -532,16 +540,20 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
                       {/* Status + Toggle Dropdown */}
                       <td className="py-3 px-4 text-center">
-                        <select
-                          value={report.status}
-                          onChange={(e) => onUpdateStatus(report.id, e.target.value as ReportStatus)}
-                          className="text-xs font-semibold px-2 py-1 rounded-lg border border-[#D9DF98] bg-[#FAFBF5] focus:bg-white text-[#231E1B] focus:outline-none cursor-pointer"
-                        >
-                          <option value="Aman">Aman</option>
-                          <option value="Perlu Follow Up">Perlu Follow Up</option>
-                          <option value="Dalam Proses">Dalam Proses</option>
-                          <option value="Selesai">Selesai</option>
-                        </select>
+                        {perms.canEditReportStatus ? (
+                          <select
+                            value={report.status}
+                            onChange={(e) => onUpdateStatus(report.id, e.target.value as ReportStatus)}
+                            className="text-xs font-semibold px-2 py-1 rounded-lg border border-[#D9DF98] bg-[#FAFBF5] focus:bg-white text-[#231E1B] focus:outline-none cursor-pointer"
+                          >
+                            <option value="Aman">Aman</option>
+                            <option value="Perlu Follow Up">Perlu Follow Up</option>
+                            <option value="Dalam Proses">Dalam Proses</option>
+                            <option value="Selesai">Selesai</option>
+                          </select>
+                        ) : (
+                          getStatusBadge(report.status)
+                        )}
                       </td>
 
                       {/* Pictures & Google Drive Link */}
@@ -562,17 +574,21 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
                       {/* Actions */}
                       <td className="py-3 px-3 text-center">
-                        <button
-                          onClick={() => {
-                            if (window.confirm('Hapus baris laporan inspeksi ini?')) {
-                              onDeleteReport(report.id);
-                            }
-                          }}
-                          className="p-1 rounded text-[#877465] hover:text-[#C25941] hover:bg-[#FBEBE7] transition"
-                          title="Hapus baris laporan"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        {perms.canDeleteReport ? (
+                          <button
+                            onClick={() => {
+                              if (window.confirm('Hapus baris laporan inspeksi ini?')) {
+                                onDeleteReport(report.id);
+                              }
+                            }}
+                            className="p-1 rounded text-[#877465] hover:text-[#C25941] hover:bg-[#FBEBE7] transition cursor-pointer"
+                            title="Hapus baris laporan"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <span className="text-gray-300 text-xs">-</span>
+                        )}
                       </td>
                     </tr>
                   );

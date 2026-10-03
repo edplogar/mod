@@ -30,7 +30,13 @@ import {
   initFirebaseAuth, 
   seedUsersToFirestore 
 } from './services/firebase';
-import { ModReportItem, ReportStatus, UserProfile, CloudSyncState } from './types';
+import { ModReportItem, ReportStatus, UserProfile, CloudSyncState, SystemPermissionsState, RolePermissionConfig } from './types';
+import { 
+  getStoredPermissions, 
+  subscribeToFirestorePermissions, 
+  fetchPermissionsFromFirestore, 
+  getUserPermissions 
+} from './services/permissionService';
 import { LoginPage } from './components/LoginPage';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
@@ -67,6 +73,7 @@ export default function App() {
 
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reports'>('dashboard');
   const [reportFilterStatus, setReportFilterStatus] = useState<string>('all');
+  const [permissions, setPermissions] = useState<SystemPermissionsState>(getStoredPermissions());
 
   // Modals
   const [isNewReportOpen, setIsNewReportOpen] = useState(false);
@@ -76,6 +83,9 @@ export default function App() {
   const [isSuperAdminLoginOpen, setIsSuperAdminLoginOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [isSuperAdminAuth, setIsSuperAdminAuth] = useState(isSuperAdminSessionValid());
+
+  // Calculate current user's effective RBAC permissions
+  const currentPermissions = getUserPermissions(currentUser, permissions);
 
   // Toast banner
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -99,6 +109,19 @@ export default function App() {
       seedUsersToFirestore(getAllUsers());
     }).catch(err => {
       console.warn('Firebase init note:', err);
+    });
+
+    // Real-time synchronization for role permissions matrix across all devices & IPs
+    fetchPermissionsFromFirestore().then((cloudPerms) => {
+      if (cloudPerms) {
+        setPermissions(cloudPerms);
+      }
+    });
+
+    const unsubPerms = subscribeToFirestorePermissions((cloudPerms) => {
+      if (cloudPerms) {
+        setPermissions(cloudPerms);
+      }
     });
 
     // Real-time synchronization for MOD reports across all devices & IPs
@@ -133,10 +156,19 @@ export default function App() {
       (err) => console.warn('Real-time settings listener note:', err)
     );
 
+    const handlePermsUpdated = (e: any) => {
+      if (e.detail) {
+        setPermissions(e.detail);
+      }
+    };
+    window.addEventListener('logar_permissions_updated', handlePermsUpdated);
+
     return () => {
       unsubReports();
       unsubUsers();
       unsubSettings();
+      unsubPerms();
+      window.removeEventListener('logar_permissions_updated', handlePermsUpdated);
     };
   }, []);
 
@@ -279,17 +311,21 @@ export default function App() {
   // Check if current user is Super Admin
   const isSuperAdmin = currentUser?.role === 'Super Admin' || isSuperAdminAuth;
 
-  // Enforce RBAC: If not Super Admin, activeTab MUST be 'dashboard'
+  // Enforce RBAC: Ensure current user stays on a permitted tab
   useEffect(() => {
-    if (!isSuperAdmin && activeTab !== 'dashboard') {
-      setActiveTab('dashboard');
+    if (currentUser) {
+      if (activeTab === 'reports' && !currentPermissions.canAccessReports) {
+        setActiveTab('dashboard');
+      } else if (activeTab === 'dashboard' && !currentPermissions.canAccessDashboard && currentPermissions.canAccessReports) {
+        setActiveTab('reports');
+      }
     }
-  }, [isSuperAdmin, activeTab]);
+  }, [currentUser, currentPermissions.canAccessReports, currentPermissions.canAccessDashboard, activeTab]);
 
-  // Navigate to reports tab with optional filter - restricted to Super Admin
+  // Navigate to reports tab with optional filter - checked against role permissions
   const handleNavigateToReports = (statusFilter?: string) => {
-    if (!isSuperAdmin) {
-      showToast('Akses dibatasi: Hanya Super Admin yang dapat mengakses riwayat data laporan.');
+    if (!currentPermissions.canAccessReports) {
+      showToast('Akses dibatasi: Role Anda tidak memiliki izin untuk melihat riwayat data laporan.');
       return;
     }
     if (statusFilter) {
@@ -301,8 +337,8 @@ export default function App() {
   };
 
   const handleOpenSuperAdmin = () => {
-    if (!isSuperAdmin) {
-      showToast('Akses dibatasi: Khusus untuk akun Super Administrator.');
+    if (!currentPermissions.canAccessSuperAdmin && !isSuperAdmin) {
+      showToast('Akses dibatasi: Khusus untuk akun dengan izin Super Administrator.');
       return;
     }
     if (isSuperAdminSessionValid()) {
@@ -390,18 +426,25 @@ export default function App() {
         setActiveTab={setActiveTab}
         currentUser={currentUser}
         syncState={syncState}
+        userPermissions={currentPermissions}
         onTriggerSync={handleTriggerSync}
-        onOpenNewReport={() => setIsNewReportOpen(true)}
+        onOpenNewReport={() => {
+          if (!currentPermissions.canCreateReport) {
+            showToast('Akses dibatasi: Role Anda tidak memiliki izin input laporan.');
+            return;
+          }
+          setIsNewReportOpen(true);
+        }}
         onOpenPdfExport={() => {
-          if (!isSuperAdmin) {
-            showToast('Akses dibatasi: Khusus Super Admin.');
+          if (!currentPermissions.canExportPdf) {
+            showToast('Akses dibatasi: Role Anda tidak memiliki izin ekspor PDF.');
             return;
           }
           setIsPdfExportOpen(true);
         }}
         onOpenCloudSync={() => {
-          if (!isSuperAdmin) {
-            showToast('Akses dibatasi: Khusus Super Admin.');
+          if (!currentPermissions.canSyncCloud) {
+            showToast('Akses dibatasi: Role Anda tidak memiliki izin sinkronisasi cloud.');
             return;
           }
           setIsCloudSyncOpen(true);
@@ -426,27 +469,41 @@ export default function App() {
             <span className="hidden md:inline">www.lombokgardenhotel.com</span>
             <span className="hidden md:inline">&bull;</span>
             <span className="font-bold text-[#EAEEBB] bg-[#231E1B]/30 px-2 py-0.5 rounded text-[10px] sm:text-xs">
-              {isSuperAdmin ? 'Super Admin' : 'Petugas MOD'}
+              {currentUser?.role || (isSuperAdmin ? 'Super Admin' : 'Petugas MOD')}
             </span>
           </div>
         </div>
 
         {/* Main Content Area */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
-          {activeTab === 'dashboard' || !isSuperAdmin ? (
+          {activeTab === 'dashboard' ? (
             <DashboardView
               reports={reports}
               currentUser={currentUser}
+              userPermissions={currentPermissions}
               onNavigateToReports={handleNavigateToReports}
-              onOpenNewReport={() => setIsNewReportOpen(true)}
+              onOpenNewReport={() => {
+                if (!currentPermissions.canCreateReport) {
+                  showToast('Akses dibatasi: Role Anda tidak memiliki izin input laporan.');
+                  return;
+                }
+                setIsNewReportOpen(true);
+              }}
             />
           ) : (
             <ReportListView
               reports={reports}
               currentUser={currentUser}
+              userPermissions={currentPermissions}
               onUpdateStatus={handleUpdateStatus}
               onDeleteReport={handleDeleteReport}
-              onOpenPdfExport={() => setIsPdfExportOpen(true)}
+              onOpenPdfExport={() => {
+                if (!currentPermissions.canExportPdf) {
+                  showToast('Akses dibatasi: Role Anda tidak memiliki izin ekspor PDF.');
+                  return;
+                }
+                setIsPdfExportOpen(true);
+              }}
               onClearAllReports={handleClearAllReports}
               initialFilterStatus={reportFilterStatus}
             />

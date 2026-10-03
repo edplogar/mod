@@ -76,8 +76,14 @@ service cloud.firestore {
     // System settings collection
     match /settings/{settingId} {
       allow read: if true;
-      allow create, update: if isValidId(settingId) && isValidSettings(incoming());
+      allow create, update: if isValidId(settingId);
       allow delete: if isValidId(settingId);
+    }
+
+    // Role permissions collection
+    match /role_permissions/{permId} {
+      allow read: if true;
+      allow create, update, delete: if isValidId(permId);
     }
 
     // Audit logs collection (immutable)

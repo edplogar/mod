@@ -432,7 +432,7 @@ export default function App() {
             </span>
           </div>
           <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-[#FAFBF5] opacity-95 shrink-0">
-            <span className="hidden md:inline">Jl. Bung Karno No. 7, Mataram</span>
+            <span className="hidden md:inline">www.lombokgardenhotel.com</span>
             <span className="hidden md:inline">&bull;</span>
             <span className="font-bold text-[#EAEEBB] bg-[#231E1B]/30 px-2 py-0.5 rounded text-[10px] sm:text-xs">
               {isSuperAdmin ? 'Super Admin' : 'Petugas MOD'}

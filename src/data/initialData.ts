@@ -1,4 +1,4 @@
-import { ModReportItem, PictureItem, Department, ReportStatus, PriorityLevel, ShiftType } from '../types';
+import type { ModReportItem, PictureItem, Department, ReportStatus, PriorityLevel, ShiftType } from '../types/index.ts';
 
 export const RAW_MOD_CSV = `Timestamp,Name,Date,Location,Problem,Follow Up,Picture
 12/5/2025 19:37:32,Iwayan Suardana ,12/5/2025 18:00:00,Gedung 5 lantai,Sikon aman ,,"https://drive.google.com/open?id=1yc-jpV6KOImEi4pGE3bWmQugJNtQKa-L, https://drive.google.com/open?id=1kF6W1A0Ln0Nl2v3g0MqN6posJ8mu-1tZ, https://drive.google.com/open?id=1sLFrgaDJ0jUXB_acWyd5ueCznsL73ACJ, https://drive.google.com/open?id=1i7iv9XrOxpCuCHFuazpxPtVsWs2RBp7S, https://drive.google.com/open?id=1-VESPiCQnskv5BeBxDen23q6tz_rM6Lt"

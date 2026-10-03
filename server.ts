@@ -1,11 +1,11 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
-import { parseCSVToReports, RAW_MOD_CSV, HOTEL_LOCATIONS, HOTEL_DEPARTMENTS } from './src/data/initialData.ts';
-import { INITIAL_HOTEL_USERS } from './src/services/authService.ts';
-import { DEFAULT_SYSTEM_SETTINGS } from './src/services/systemSettingsService.ts';
-import { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from './src/types/index.ts';
+import { parseCSVToReports, RAW_MOD_CSV } from './src/data/initialData.ts';
+import { INITIAL_HOTEL_USERS, DEFAULT_SYSTEM_SETTINGS } from './src/data/defaultConstants.ts';
+import type { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from './src/types/index.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

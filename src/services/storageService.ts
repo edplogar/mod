@@ -1,4 +1,4 @@
-import { ModReportItem, CloudSyncState, PictureItem } from '../types';
+import { ModReportItem, CloudSyncState, PictureItem } from '../types/index.ts';
 import { parseCSVToReports, RAW_MOD_CSV } from '../data/initialData';
 import { getSystemSettings } from './systemSettingsService';
 import { syncAllPhotosToDrive, extractDriveFolderId, getDriveFolderUrl } from './driveSyncService';
@@ -21,15 +21,6 @@ export function loadReports(): ModReportItem[] {
     console.error('Error loading reports from localStorage', e);
   }
 
-  // If reports have been explicitly cleared or freshly started
-  const isCleared = localStorage.getItem(CLEARED_KEY);
-  if (isCleared === 'true') {
-    saveReports([]);
-    return [];
-  }
-
-  // Default empty initial list as requested
-  saveReports([]);
   return [];
 }
 
@@ -42,7 +33,6 @@ export function saveReports(reports: ModReportItem[]): void {
 }
 
 export async function clearAllReports(): Promise<void> {
-  localStorage.setItem(CLEARED_KEY, 'true');
   saveReports([]);
   try {
     await clearAllReportsFromFirestore();

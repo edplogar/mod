@@ -1,4 +1,4 @@
-import { UserProfile, UserRole, Department } from '../types';
+import { UserProfile, UserRole, Department } from '../types/index.ts';
 import { saveUserToFirestore, deleteUserFromFirestore } from './firebase';
 
 export const INITIAL_HOTEL_USERS: UserProfile[] = [

@@ -89,19 +89,10 @@ export default function App() {
 
   // Initialize data & real-time Firestore sync listeners
   useEffect(() => {
-    // Check if reports have been cleared as requested by user ("hapus semua data laporan yang ada")
-    const hasCleared = localStorage.getItem('mod_report_has_cleared_by_user_req_v1');
-    if (!hasCleared) {
-      localStorage.setItem('mod_report_has_cleared_by_user_req_v1', 'true');
-      clearAllReports().then(() => {
-        setReports([]);
-        setSyncState(getSyncState([]));
-      });
-    } else {
-      const loaded = loadReports();
-      setReports(loaded);
-      setSyncState(getSyncState(loaded));
-    }
+    // Load cached reports immediately for zero-delay UI display
+    const loaded = loadReports();
+    setReports(loaded);
+    setSyncState(getSyncState(loaded));
 
     // Initialize Firebase Auth & seed initial users to Firestore
     initFirebaseAuth().then(() => {

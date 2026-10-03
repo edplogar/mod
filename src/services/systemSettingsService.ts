@@ -1,4 +1,4 @@
-import { SystemSettings, SystemAuditLog, HotelLocationConfig } from '../types';
+import { SystemSettings, SystemAuditLog, HotelLocationConfig } from '../types/index.ts';
 import { HOTEL_LOCATIONS, HOTEL_DEPARTMENTS, RAW_MOD_CSV, parseCSVToReports } from '../data/initialData';
 import { saveReports, saveSyncConfig } from './storageService';
 import { saveAllUsers, INITIAL_HOTEL_USERS } from './authService';

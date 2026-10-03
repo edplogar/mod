@@ -21,7 +21,7 @@ import {
   signInAnonymously
 } from 'firebase/auth';
 import firebaseConfig from '../../firebase-applet-config.json';
-import { ModReportItem, UserProfile, SystemSettings, SystemAuditLog } from '../types';
+import { ModReportItem, UserProfile, SystemSettings, SystemAuditLog } from '../types/index.ts';
 
 // Initialize Firebase App
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);

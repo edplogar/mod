@@ -130,10 +130,10 @@ export const Navbar: React.FC<NavbarProps> = ({
       >
         {/* Top Section: Branding & Pin Toggle */}
         <div className="p-3.5 border-b border-[#3D352F] flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-2">
             {isExpanded ? (
               <div 
-                className="flex items-center gap-2 cursor-pointer overflow-hidden" 
+                className="flex items-center gap-2 cursor-pointer overflow-hidden min-w-0 flex-1" 
                 onClick={() => handleTabChange('dashboard')}
               >
                 <LogarLogo variant="full" light={true} />
@@ -141,36 +141,50 @@ export const Navbar: React.FC<NavbarProps> = ({
             ) : (
               <div 
                 className="mx-auto cursor-pointer" 
-                onClick={() => handleTabChange('dashboard')}
-                title="Hotel Lombok Garden - MOD LOGAR"
+                onClick={() => {
+                  setIsPinned(true);
+                  setIsHovered(true);
+                }}
+                title="Buka Menu Navigasi Lengkap"
               >
-                <LogarLogo variant="icon" className="w-10 h-10" />
+                <LogarLogo variant="icon" className="w-10 h-10 hover:scale-105 transition-transform" />
               </div>
             )}
 
-            {/* Desktop Pin / Autohide Toggle Button */}
+            {/* Action Buttons: Pin & Always-Visible Close Button */}
             {isExpanded && (
-              <button
-                type="button"
-                onClick={() => setIsPinned(!isPinned)}
-                className={`hidden lg:flex items-center justify-center w-7 h-7 rounded-lg transition shrink-0 ${
-                  isPinned 
-                    ? 'bg-[#95A823] text-white shadow-xs' 
-                    : 'bg-[#2E2824] hover:bg-[#3B332E] text-[#C6CC81] hover:text-white'
-                }`}
-                title={isPinned ? 'Lepas Sematan (Aktifkan Mode Autohide)' : 'Sematkan Sidebar (Tetap Terbuka)'}
-              >
-                {isPinned ? <Pin className="w-3.5 h-3.5" /> : <PinOff className="w-3.5 h-3.5" />}
-              </button>
-            )}
+              <div className="flex items-center gap-1.5 shrink-0">
+                {/* Desktop Pin / Autohide Toggle Button */}
+                <button
+                  type="button"
+                  onClick={() => setIsPinned(!isPinned)}
+                  className={`hidden sm:flex items-center justify-center w-8 h-8 rounded-xl transition cursor-pointer ${
+                    isPinned 
+                      ? 'bg-[#95A823] text-white shadow-xs border border-[#95A823]' 
+                      : 'bg-[#2E2824] hover:bg-[#3B332E] text-[#C6CC81] hover:text-white border border-[#453D37]'
+                  }`}
+                  title={isPinned ? 'Lepas Sematan (Aktifkan Mode Autohide)' : 'Sematkan Sidebar (Tetap Terbuka)'}
+                  aria-label={isPinned ? 'Lepas Sematan' : 'Sematkan Sidebar'}
+                >
+                  {isPinned ? <Pin className="w-4 h-4" /> : <PinOff className="w-4 h-4 text-[#877465]" />}
+                </button>
 
-            {/* Mobile Close Button */}
-            <button
-              onClick={() => setIsMobileOpen(false)}
-              className="lg:hidden p-1 rounded-lg text-[#C6CC81] hover:text-white hover:bg-[#322A25]"
-            >
-              <X className="w-5 h-5" />
-            </button>
+                {/* Close Button - VISIBLE ON ALL DEVICES (Mobile, Tablet, Desktop, Laptop) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsMobileOpen(false);
+                    setIsPinned(false);
+                    setIsHovered(false);
+                  }}
+                  className="w-8 h-8 rounded-xl bg-[#2E2824] hover:bg-[#C25941] text-[#EAEEBB] hover:text-white border border-[#453D37] hover:border-[#C25941] flex items-center justify-center transition shadow-xs cursor-pointer"
+                  title="Tutup Menu (Close)"
+                  aria-label="Tutup Menu"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Role Status Tag when Expanded */}
@@ -410,10 +424,24 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
           )}
 
-          {/* Autohide Hint Footer */}
+          {/* Autohide Hint Footer & Quick Close */}
           {isExpanded && (
-            <div className="text-[9px] text-[#70635A] text-center pt-1 font-medium hidden lg:block">
-              {isPinned ? '📌 Sidebar Tersemat' : '🔓 Mode Autohide Aktif'}
+            <div className="flex items-center justify-between pt-1 px-1 text-[10px] text-[#A89E96]">
+              <span className="truncate">
+                {isPinned ? '📌 Tersemat' : '🔓 Mode Autohide'}
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMobileOpen(false);
+                  setIsPinned(false);
+                  setIsHovered(false);
+                }}
+                className="text-[#D9DF98] hover:text-[#EAEEBB] hover:underline font-semibold cursor-pointer shrink-0"
+                title="Tutup Menu"
+              >
+                Tutup Menu &times;
+              </button>
             </div>
           )}
         </div>

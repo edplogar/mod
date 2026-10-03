@@ -424,17 +424,17 @@ export default function App() {
       {/* Main Content Layout with Left Offset on Desktop for Autohide Sidebar */}
       <div className="flex-1 flex flex-col min-w-0 lg:pl-[72px] transition-all duration-300">
         {/* Top Slim Hotel Identity Bar */}
-        <div className="bg-[#95A823] px-4 py-1.5 text-xs text-white font-medium flex items-center justify-between border-b border-[#7B8C1B]/40">
-          <div className="flex items-center gap-2">
-            <span className="inline-block w-2 h-2 rounded-full bg-[#EAEEBB] animate-pulse"></span>
+        <div className="bg-[#95A823] px-3 sm:px-4 py-1.5 text-xs text-white font-medium flex items-center justify-between border-b border-[#7B8C1B]/40 gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="inline-block w-2 h-2 rounded-full bg-[#EAEEBB] animate-pulse shrink-0"></span>
             <span className="font-semibold tracking-wide text-white text-[11px] truncate">
               HOTEL LOMBOK GARDEN &bull; SISTEM RESMI MANAGER ON DUTY (MOD LOGAR)
             </span>
           </div>
-          <div className="flex items-center gap-3 text-[11px] text-[#FAFBF5] opacity-95 shrink-0">
-            <span className="hidden sm:inline">Jl. Bung Karno No. 7, Mataram</span>
-            <span className="hidden sm:inline">&bull;</span>
-            <span className="font-bold text-[#EAEEBB] bg-[#231E1B]/30 px-2 py-0.5 rounded">
+          <div className="flex items-center gap-2 sm:gap-3 text-[11px] text-[#FAFBF5] opacity-95 shrink-0">
+            <span className="hidden md:inline">Jl. Bung Karno No. 7, Mataram</span>
+            <span className="hidden md:inline">&bull;</span>
+            <span className="font-bold text-[#EAEEBB] bg-[#231E1B]/30 px-2 py-0.5 rounded text-[10px] sm:text-xs">
               {isSuperAdmin ? 'Super Admin' : 'Petugas MOD'}
             </span>
           </div>

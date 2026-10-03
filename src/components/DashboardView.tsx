@@ -282,7 +282,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </span>
           </div>
           <h2 className="text-xl sm:text-2xl font-black text-[#231E1B] mt-1.5 tracking-tight">
-            Ringkasan Operasional &amp; Inspeksi Lapangan
+            MANAGER ON DUTY REPORT
           </h2>
           <p className="text-xs text-[#70635A] mt-0.5">
             Monitoring kondisi fisik hotel, patroli keamanan, kebersihan, dan follow-up departemen Hotel Lombok Garden.

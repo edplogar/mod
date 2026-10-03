@@ -1,6 +1,7 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { ModReportItem, UserProfile } from '../types';
+import { getHotelBranding, getSystemSettings } from './systemSettingsService';
 
 export interface PdfExportOptions {
   title?: string;
@@ -16,6 +17,9 @@ export function exportModReportToPdf(
   reports: ModReportItem[],
   options: PdfExportOptions
 ): void {
+  const branding = getHotelBranding();
+  const settings = getSystemSettings();
+
   const doc = new jsPDF({
     orientation: 'portrait',
     unit: 'mm',
@@ -29,30 +33,33 @@ export function exportModReportToPdf(
   doc.setFillColor(35, 30, 27);
   doc.rect(0, 0, pageWidth, 28, 'F');
 
-  // Decorative Accent bar (Official Lombok Garden Olive Green #95A823)
+  // Decorative Accent bar (Custom brand background color or #95A823)
   doc.setFillColor(149, 168, 35);
   doc.rect(0, 28, pageWidth, 2.5, 'F');
 
   doc.setTextColor(255, 255, 255);
   doc.setFontSize(16);
   doc.setFont('helvetica', 'bold');
-  doc.text('HOTEL LOMBOK GARDEN', 14, 11);
+  const pdfHotelName = `HOTEL ${branding.brandTitle || 'LOMBOK GARDEN'}`;
+  doc.text(pdfHotelName, 14, 11);
 
   doc.setFontSize(8.5);
   doc.setFont('helvetica', 'italic');
   doc.setTextColor(217, 223, 152); // #D9DF98
-  doc.text('Experience the Green of the City', 14, 16);
+  doc.text(branding.tagline || 'Experience the Green of the City', 14, 16);
 
   doc.setFontSize(8);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(198, 204, 129); // #C6CC81
-  doc.text('Jl. Bung Karno No. 7, Mataram, NTB | Telp: 0370 636015 | hotellombokgarden@gmail.com', 14, 22);
+  const contactText = `${settings.hotelAddress || 'Jl. Bung Karno No. 7, Mataram, NTB'} | Telp: ${settings.hotelPhone || '0370 636015'} | ${settings.hotelEmail || 'hotellombokgarden@gmail.com'}`;
+  doc.text(contactText, 14, 22);
 
   // Document Title Box
   doc.setFontSize(13);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(35, 30, 27);
-  doc.text('LAPORAN RESMI MANAGER ON DUTY (MOD REPORT LOGAR)', 14, 38);
+  const docTitleText = `LAPORAN RESMI MANAGER ON DUTY (${branding.brandSubtitle || 'MOD REPORT LOGAR'})`;
+  doc.text(docTitleText, 14, 38);
 
   const printDate = new Date().toLocaleString('id-ID', {
     dateStyle: 'full',

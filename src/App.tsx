@@ -47,6 +47,7 @@ import { CloudSyncModal } from './components/CloudSyncModal';
 import { AuthModal } from './components/AuthModal';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { SuperAdminLoginModal } from './components/admin/SuperAdminLoginModal';
+import { ChangeLogoModal } from './components/ChangeLogoModal';
 import { 
   Building2, 
   CheckCircle, 
@@ -80,6 +81,7 @@ export default function App() {
   const [isPdfExportOpen, setIsPdfExportOpen] = useState(false);
   const [isCloudSyncOpen, setIsCloudSyncOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isChangeLogoOpen, setIsChangeLogoOpen] = useState(false);
   const [isSuperAdminLoginOpen, setIsSuperAdminLoginOpen] = useState(false);
   const [isAdminView, setIsAdminView] = useState(false);
   const [isSuperAdminAuth, setIsSuperAdminAuth] = useState(isSuperAdminSessionValid());
@@ -451,6 +453,7 @@ export default function App() {
         }}
         onOpenAuth={() => setIsAuthOpen(true)}
         onOpenSuperAdmin={handleOpenSuperAdmin}
+        onOpenChangeLogo={currentPermissions.canAccessSuperAdmin ? () => setIsChangeLogoOpen(true) : undefined}
         isSuperAdminAuth={isSuperAdminAuth}
         onLogout={handleLogout}
       />
@@ -583,6 +586,13 @@ export default function App() {
           saveStoredUser(updated);
           showToast('Foto profil berhasil diperbarui!');
         }}
+      />
+
+      <ChangeLogoModal
+        isOpen={isChangeLogoOpen}
+        onClose={() => setIsChangeLogoOpen(false)}
+        currentUser={currentUser}
+        onSuccess={() => showToast('Logo dan Identitas Hotel berhasil disimpan & disinkronkan!')}
       />
 
       <SuperAdminLoginModal

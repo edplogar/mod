@@ -1,78 +1,295 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import { HotelBrandingConfig, LogoShape } from '../types';
+import { getHotelBranding } from '../services/systemSettingsService';
+import { Edit2, Sparkles, Building2, Shield, Leaf } from 'lucide-react';
 
 interface LogarLogoProps {
   className?: string;
-  variant?: 'full' | 'icon' | 'badge';
+  variant?: 'full' | 'icon' | 'badge' | 'header';
   light?: boolean;
+  branding?: HotelBrandingConfig;
+  onEdit?: () => void;
+  showEditButton?: boolean;
+}
+
+/**
+ * Official Lombok Garden Hotel 5-Petal Flower Emblem
+ * Vectorized from official Lombok Garden branding emblem (40.png)
+ */
+export const HotelFlowerIcon: React.FC<{ className?: string; color?: string; centerColor?: string }> = ({
+  className = 'w-6 h-6',
+  color = '#FFFFFF',
+  centerColor = '#FFFFFF',
+}) => {
+  return (
+    <svg
+      viewBox="0 0 100 100"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      className={className}
+      aria-label="Lombok Garden Hotel Flower Logo"
+    >
+      {/* 5-Petal Flower Silhouette */}
+      <path
+        d="M50 44
+           C46 36 34 22 23 23
+           C15 24 13 32 17 39
+           C20 44 26 47 33 49
+           C25 50 14 51 9 58
+           C5 63 7 70 14 74
+           C21 78 30 76 38 70
+           C37 77 37 84 41 89
+           C45 94 54 94 59 89
+           C63 85 64 79 64 72
+           C71 77 80 80 87 75
+           C94 70 95 62 90 56
+           C85 50 76 49 68 49
+           C75 46 83 40 85 33
+           C87 25 80 18 72 19
+           C62 20 54 33 50 44 Z"
+        fill={color}
+      />
+      {/* Refined Petal Layers & Ruffles for high fidelity match */}
+      <path
+        d="M48.5 42
+           C44.2 32.8 32.5 17.5 21.2 19.8
+           C12.8 21.5 10.5 30.8 15.2 38.5
+           C18.8 44.5 26.2 47.8 34.5 49.2
+           C25.2 49.8 12.8 51.2 7.8 59.5
+           C3.8 66.2 7.2 74.5 15.5 77.8
+           C23.2 80.8 32.5 77.2 39.8 70.5
+           C38.2 78.5 38.8 86.8 43.8 91.5
+           C48.5 95.8 57.5 94.5 62.2 88.5
+           C65.8 83.8 65.5 76.5 64.8 69.2
+           C72.5 75.2 82.8 77.8 89.8 72.2
+           C96.5 66.8 96.8 57.5 90.8 50.8
+           C85.2 44.5 75.8 44.8 67.2 46.5
+           C74.5 42.2 83.8 35.5 84.8 27.2
+           C85.8 18.5 77.8 12.5 68.8 14.5
+           C58.5 16.8 52.2 31.5 48.5 42 Z"
+        fill={color}
+      />
+
+      {/* Center Stamen & Pistil Core Details matching 40.png */}
+      <circle cx="50" cy="51.5" r="5.5" fill="#231E1B" />
+      <circle cx="50" cy="51.5" r="4" fill={centerColor === '#FFFFFF' ? '#EAEEBB' : '#95A823'} />
+
+      {/* Radiating Flower Stamen / Anther Filaments */}
+      <g stroke="#231E1B" strokeWidth="1.5" strokeLinecap="round">
+        <path d="M46 47.5 L39 40" />
+        <circle cx="38" cy="39" r="1.2" fill="#231E1B" />
+
+        <path d="M48 45.5 L45 35" />
+        <circle cx="44.5" cy="34" r="1.2" fill="#231E1B" />
+
+        <path d="M52 46 L57 37" />
+        <circle cx="58" cy="36" r="1.2" fill="#231E1B" />
+
+        <path d="M54 48 L63 43" />
+        <circle cx="64" cy="42" r="1.2" fill="#231E1B" />
+
+        <path d="M55 52 L65 54" />
+        <circle cx="66" cy="54.5" r="1.2" fill="#231E1B" />
+
+        <path d="M53.5 55.5 L60 64" />
+        <circle cx="61" cy="65" r="1.2" fill="#231E1B" />
+
+        <path d="M50 56.5 L49 66" />
+        <circle cx="49" cy="67.5" r="1.2" fill="#231E1B" />
+
+        <path d="M46 54.5 L39 61" />
+        <circle cx="38" cy="62" r="1.2" fill="#231E1B" />
+
+        <path d="M44.5 51 L35 51.5" />
+        <circle cx="34" cy="51.5" r="1.2" fill="#231E1B" />
+      </g>
+    </svg>
+  );
+};
+
+export function getShapeClass(shape: LogoShape = 'rounded'): string {
+  switch (shape) {
+    case 'circle':
+      return 'rounded-full';
+    case 'square':
+      return 'rounded-md';
+    case 'rounded':
+    default:
+      return 'rounded-2xl';
+  }
 }
 
 export const LogarLogo: React.FC<LogarLogoProps> = ({
   className = 'h-9 w-auto',
   variant = 'full',
   light = true,
+  branding: propBranding,
+  onEdit,
+  showEditButton = false,
 }) => {
+  const [activeBranding, setActiveBranding] = useState<HotelBrandingConfig>(() => {
+    return propBranding || getHotelBranding();
+  });
+  const [imageError, setImageError] = useState(false);
+
+  useEffect(() => {
+    if (propBranding) {
+      setActiveBranding(propBranding);
+      setImageError(false);
+      return;
+    }
+
+    const handleSettingsUpdate = (e: any) => {
+      if (e.detail?.branding) {
+        setActiveBranding(e.detail.branding);
+        setImageError(false);
+      }
+    };
+
+    window.addEventListener('logar_settings_updated', handleSettingsUpdate);
+    return () => {
+      window.removeEventListener('logar_settings_updated', handleSettingsUpdate);
+    };
+  }, [propBranding]);
+
   const textColor = light ? '#FFFFFF' : '#231E1B';
-  const greenColor = '#95A823';
-  const earthColor = '#877465';
+  const bgColor = activeBranding.bgColor || '#95A823';
+  const shapeClass = getShapeClass(activeBranding.logoShape);
+  const brandTitle = activeBranding.brandTitle || 'LOMBOK GARDEN';
+  const brandSubtitle = activeBranding.brandSubtitle || 'HOTEL • REPORT LOGAR';
+  const badgeText = activeBranding.badgeText || 'MOD';
+  const hasCustomImage = Boolean(activeBranding.logoUrl && !imageError);
+
+  // Render Inner Icon/Image content
+  const renderIconContent = () => {
+    if (hasCustomImage && activeBranding.logoUrl) {
+      return (
+        <img
+          src={activeBranding.logoUrl}
+          alt={brandTitle}
+          className="w-full h-full object-contain filter drop-shadow-xs"
+          onError={() => setImageError(true)}
+        />
+      );
+    }
+
+    if (activeBranding.customIconType === 'building') {
+      return <Building2 className="w-full h-full text-white p-1" />;
+    }
+    if (activeBranding.customIconType === 'shield') {
+      return <Shield className="w-full h-full text-white p-1" />;
+    }
+    if (activeBranding.customIconType === 'leaf') {
+      return <Leaf className="w-full h-full text-white p-1" />;
+    }
+
+    return <HotelFlowerIcon className="w-full h-full" color="#FFFFFF" centerColor="#EAEEBB" />;
+  };
 
   if (variant === 'icon') {
     return (
-      <svg
-        viewBox="0 0 135 135"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        className={className}
-      >
-        <circle cx="67.5" cy="67.5" r="64" fill={greenColor} />
-        {/* Stylized Lotus Floral Motif matching official Lombok Garden emblem */}
-        <g fill="#FFFFFF">
-          <path d="M54.7,68.8c-1.4,1.1-2.6,2.6-3.7,4c0,0.1,0.4,0.1,0.6,0.1c3.2-1.5,6.9-1.8,9.6,0.4c-4.3,0.8-8.8,2.5-11.9,5.8c-0.4,0.4,0.3,1.4,1,1.7c2.5,1,5.4,0.1,8-0.4c-1,0.8-1.9,1.7-2.8,2.6c-1.4,1.5-2.5,3-3.9,4.4c-2.6,2.5-5.5,4.4-8.7,6.1c-4.4,1.9-9.5,2.6-14.1,0.8c-3.4-1.4-6.6-3.3-8.8-6.6C16,81.8,11,76.3,4,74.7c6.1-5.6,11.7-11.4,17.6-17.5c4.5-4.5,11.9-5.4,17.9-3.3c3.4,1.1,6.5,2.8,9.6,4.4c4.3,2.3,8.3,4.3,12.3,6.8C59,65.7,56.8,67.2,54.7,68.8z" />
-          <path d="M58.7,32.9c5.1,7.4,5.5,16,4.4,24.3c-1.1-3.9-2.5-7.9-4.8-11c-1.9-2.2-4.1-1.9-4.7-1.7c-2.2,1.1-1,3.6-0.3,5.2c1,2.1,1.8,3.2,2.8,4.8c1.2,1.8,2.5,3.4,3.9,4.8c-12-4.3-24.4-8.7-34-17.8c-1.8-1.8-3.2-3.9-3.4-6.3c-0.3-1.9,0.1-3.9,0.7-5.8c0.1-0.7,0.4-1.1,0.7-1.7c1.5-2.6,4.1-4.3,7-5c4-1,7.9-1,11.9-0.6c1.7,0.3,3.3,0.8,4.8,1.4C52,25.7,55.8,28.7,58.7,32.9z" />
-          <path d="M118.4,29.8c1.4,3.2,4,5.6,6.3,8c2.5,2.3,3.4,6.1,2.2,9.4c-2.5,5.8-8.3,9-13.6,11.6c-2.3,1-4.7,1.8-7,2.9c-7.7,3.6-15.2,7.2-22,12.1c4.3-4.8,8-9.5,11.7-15c2.6-4.1,5.9-7.7,6.2-12.5c-3.3,1-5.9,3-9,5.1c-5.2,3.4-9.6,7.3-13.6,12c4.1-9.2,8.3-18.2,11.2-28.2c0.1-0.7,0.3-1.2,0.1-1.8c0-0.3,0.1-0.8-0.1-0.7c-6.1,5.6-11.6,11.7-15,19.3c0.6-3.7,1.1-7.3,0.4-11.2c-0.1-1.1-0.7-2.1-1.4-2.6c-2.9,6.6-6.1,13.2-7.2,20.4C65,46.1,64.9,33,72.6,21.6c3.6-5.1,8-8.5,13.4-11.2c5.4-2.5,10.9-3.9,16.7-4.5c3.7-0.6,7.4,0.1,10.3,2.5c4.8,4.3,4.8,11,4.4,16.8C117.3,27.1,117.7,28.5,118.4,29.8z" />
-          <path d="M100.2,101.8c-1.7,4.4-4.5,7.9-8.4,10.9c-3.7,2.6-8.3,1.9-11.6-0.7c-1.9,6.5-6.5,13.9-14.2,13.6c-4.1-0.3-7.7-1.9-10.9-4.4c-3.9-3-6.6-7-7.6-11.9c-0.6-3.2,1-5.9,3.6-7.7c0-0.1,0-0.3-0.1-0.4c-3.2-0.8-6.1-2.8-7.6-5.9c2.3-0.8,4.3-2.3,6.2-3.7c4-2.8,6.1-6.5,9.5-9.5c1-0.8,1.9-1.9,2.9-2.1c3-0.1,5.9,1.2,8.7,3c1.5,1.1,3,2.2,3.2,4.1c0.6,7.2-5,12.4-9.1,17.6c1.7-0.1,2.6-1.4,4-2.3c2.5-1.5,4.1-3.3,6.1-5.8c2.2-2.9,3.2-6.2,3-9.8c2.6-4.1,7.7-7.7,12.8-5c1.4,0.8,2.6,1.7,3.6,2.9c1.4,1.8,3,3,4.3,5C101,93.5,101.7,97.9,100.2,101.8z" />
-          <circle cx="73" cy="69" r="6" fill="#EAEEBB" />
-        </g>
-      </svg>
+      <div className="relative group inline-block">
+        <div
+          className={`relative flex items-center justify-center p-1.5 shadow-md transition-all duration-300 ${shapeClass} ${className}`}
+          style={{ backgroundColor: bgColor }}
+        >
+          {renderIconContent()}
+        </div>
+
+        {showEditButton && onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#231E1B] text-[#EAEEBB] hover:bg-[#95A823] hover:text-white border border-[#EAEEBB]/50 flex items-center justify-center shadow-lg transition-transform hover:scale-110 opacity-0 group-hover:opacity-100 z-10"
+            title="Ganti Logo & Ikon"
+            aria-label="Ganti Logo"
+          >
+            <Edit2 className="w-2.5 h-2.5" />
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  if (variant === 'badge') {
+    return (
+      <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-[#231E1B] border border-[#3D352F] text-white shadow-md relative group ${className}`}>
+        <div
+          className={`w-6 h-6 flex items-center justify-center p-0.5 shrink-0 ${shapeClass}`}
+          style={{ backgroundColor: bgColor }}
+        >
+          {renderIconContent()}
+        </div>
+        <div className="leading-tight">
+          <span className="font-extrabold text-xs tracking-wider uppercase">{brandTitle}</span>
+          <span className="block text-[9px] text-[#C6CC81] font-bold">{brandSubtitle}</span>
+        </div>
+
+        {showEditButton && onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="w-4 h-4 rounded-full bg-[#3D352F] hover:bg-[#95A823] text-[#EAEEBB] hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity ml-1"
+            title="Ganti Logo"
+          >
+            <Edit2 className="w-2.5 h-2.5" />
+          </button>
+        )}
+      </div>
     );
   }
 
   return (
-    <div className={`flex items-center gap-2.5 ${className}`}>
-      {/* Official Floral Emblem */}
-      <div className="w-10 h-10 rounded-xl bg-[#95A823] flex items-center justify-center p-1.5 shadow-sm shadow-[#95A823]/30 shrink-0">
-        <svg
-          viewBox="0 0 135 135"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-          className="w-full h-full text-white"
+    <div className={`flex items-center gap-2.5 relative group ${className}`}>
+      {/* Emblem Icon / Custom Logo Container */}
+      <div className="relative">
+        <div
+          className={`w-10 h-10 flex items-center justify-center p-1.5 shadow-md transition-all duration-300 shrink-0 border border-white/20 ${shapeClass}`}
+          style={{ backgroundColor: bgColor }}
         >
-          <g fill="#FFFFFF">
-            <path d="M54.7,68.8c-1.4,1.1-2.6,2.6-3.7,4c0,0.1,0.4,0.1,0.6,0.1c3.2-1.5,6.9-1.8,9.6,0.4c-4.3,0.8-8.8,2.5-11.9,5.8c-0.4,0.4,0.3,1.4,1,1.7c2.5,1,5.4,0.1,8-0.4c-1,0.8-1.9,1.7-2.8,2.6c-1.4,1.5-2.5,3-3.9,4.4c-2.6,2.5-5.5,4.4-8.7,6.1c-4.4,1.9-9.5,2.6-14.1,0.8c-3.4-1.4-6.6-3.3-8.8-6.6C16,81.8,11,76.3,4,74.7c6.1-5.6,11.7-11.4,17.6-17.5c4.5-4.5,11.9-5.4,17.9-3.3c3.4,1.1,6.5,2.8,9.6,4.4c4.3,2.3,8.3,4.3,12.3,6.8C59,65.7,56.8,67.2,54.7,68.8z" />
-            <path d="M58.7,32.9c5.1,7.4,5.5,16,4.4,24.3c-1.1-3.9-2.5-7.9-4.8-11c-1.9-2.2-4.1-1.9-4.7-1.7c-2.2,1.1-1,3.6-0.3,5.2c1,2.1,1.8,3.2,2.8,4.8c1.2,1.8,2.5,3.4,3.9,4.8c-12-4.3-24.4-8.7-34-17.8c-1.8-1.8-3.2-3.9-3.4-6.3c-0.3-1.9,0.1-3.9,0.7-5.8c0.1-0.7,0.4-1.1,0.7-1.7c1.5-2.6,4.1-4.3,7-5c4-1,7.9-1,11.9-0.6c1.7,0.3,3.3,0.8,4.8,1.4C52,25.7,55.8,28.7,58.7,32.9z" />
-            <path d="M118.4,29.8c1.4,3.2,4,5.6,6.3,8c2.5,2.3,3.4,6.1,2.2,9.4c-2.5,5.8-8.3,9-13.6,11.6c-2.3,1-4.7,1.8-7,2.9c-7.7,3.6-15.2,7.2-22,12.1c4.3-4.8,8-9.5,11.7-15c2.6-4.1,5.9-7.7,6.2-12.5c-3.3,1-5.9,3-9,5.1c-5.2,3.4-9.6,7.3-13.6,12c4.1-9.2,8.3-18.2,11.2-28.2c0.1-0.7,0.3-1.2,0.1-1.8c0-0.3,0.1-0.8-0.1-0.7c-6.1,5.6-11.6,11.7-15,19.3c0.6-3.7,1.1-7.3,0.4-11.2c-0.1-1.1-0.7-2.1-1.4-2.6c-2.9,6.6-6.1,13.2-7.2,20.4C65,46.1,64.9,33,72.6,21.6c3.6-5.1,8-8.5,13.4-11.2c5.4-2.5,10.9-3.9,16.7-4.5c3.7-0.6,7.4,0.1,10.3,2.5c4.8,4.3,4.8,11,4.4,16.8C117.3,27.1,117.7,28.5,118.4,29.8z" />
-            <path d="M100.2,101.8c-1.7,4.4-4.5,7.9-8.4,10.9c-3.7,2.6-8.3,1.9-11.6-0.7c-1.9,6.5-6.5,13.9-14.2,13.6c-4.1-0.3-7.7-1.9-10.9-4.4c-3.9-3-6.6-7-7.6-11.9c-0.6-3.2,1-5.9,3.6-7.7c0-0.1,0-0.3-0.1-0.4c-3.2-0.8-6.1-2.8-7.6-5.9c2.3-0.8,4.3-2.3,6.2-3.7c4-2.8,6.1-6.5,9.5-9.5c1-0.8,1.9-1.9,2.9-2.1c3-0.1,5.9,1.2,8.7,3c1.5,1.1,3,2.2,3.2,4.1c0.6,7.2-5,12.4-9.1,17.6c1.7-0.1,2.6-1.4,4-2.3c2.5-1.5,4.1-3.3,6.1-5.8c2.2-2.9,3.2-6.2,3-9.8c2.6-4.1,7.7-7.7,12.8-5c1.4,0.8,2.6,1.7,3.6,2.9c1.4,1.8,3,3,4.3,5C101,93.5,101.7,97.9,100.2,101.8z" />
-          </g>
-        </svg>
+          {renderIconContent()}
+        </div>
+
+        {showEditButton && onEdit && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdit();
+            }}
+            className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-[#231E1B] text-[#EAEEBB] hover:bg-[#95A823] hover:text-white border border-[#EAEEBB]/60 flex items-center justify-center shadow-lg transition-transform hover:scale-110 opacity-0 group-hover:opacity-100 z-10"
+            title="Ganti Logo & Ikon Hotel"
+            aria-label="Ganti Logo"
+          >
+            <Edit2 className="w-2.5 h-2.5" />
+          </button>
+        )}
       </div>
 
       {/* Typography */}
       <div className="leading-tight">
         <div className="flex items-center gap-1.5">
           <span 
-            className="font-extrabold text-base tracking-wider uppercase font-sans"
+            className="font-extrabold text-base tracking-wider uppercase font-sans truncate max-w-[180px] sm:max-w-[240px]"
             style={{ color: textColor }}
           >
-            LOMBOK GARDEN
+            {brandTitle}
           </span>
           <span 
-            className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-wide uppercase"
-            style={{ backgroundColor: greenColor, color: '#FFFFFF' }}
+            className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-wide uppercase shadow-2xs shrink-0"
+            style={{ backgroundColor: bgColor, color: '#FFFFFF' }}
           >
-            MOD
+            {badgeText}
           </span>
         </div>
-        <p className="text-[10px] tracking-widest uppercase font-semibold text-[#C6CC81]">
-          HOTEL &bull; REPORT LOGAR
+        <p className="text-[10px] tracking-widest uppercase font-semibold text-[#C6CC81] truncate max-w-[200px] sm:max-w-[260px]">
+          {brandSubtitle}
         </p>
       </div>
     </div>

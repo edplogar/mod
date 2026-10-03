@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { 
   User, 
   KeyRound, 
@@ -6,24 +6,43 @@ import {
   EyeOff, 
   AlertCircle, 
   ArrowRight,
-  ShieldCheck
+  ShieldCheck,
+  Sparkles,
+  Edit2
 } from 'lucide-react';
-import { UserProfile } from '../types';
+import { UserProfile, HotelBrandingConfig } from '../types';
 import { authenticateUser } from '../services/authService';
 import { fetchFullDatabaseSync } from '../services/liveSyncService';
-import { LogarLogo } from './LogarLogo';
+import { getHotelBranding } from '../services/systemSettingsService';
+import { LogarLogo, HotelFlowerIcon, getShapeClass } from './LogarLogo';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
   onOpenSuperAdmin?: () => void;
 }
 
-export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenSuperAdmin }) => {
+export const LoginPage: React.FC<LoginPageProps> = ({ 
+  onLoginSuccess, 
+  onOpenSuperAdmin,
+}) => {
   const [usernameOrEmail, setUsernameOrEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [branding, setBranding] = useState<HotelBrandingConfig>(() => getHotelBranding());
+
+  useEffect(() => {
+    const handleSettingsUpdate = (e: any) => {
+      if (e.detail?.branding) {
+        setBranding(e.detail.branding);
+      }
+    };
+    window.addEventListener('logar_settings_updated', handleSettingsUpdate);
+    return () => {
+      window.removeEventListener('logar_settings_updated', handleSettingsUpdate);
+    };
+  }, []);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -53,12 +72,19 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenSupe
       <header className="bg-[#231E1B] border-b border-[#3D352F] text-white py-3 px-4 sm:px-8 shadow-md">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <LogarLogo variant="full" light={true} />
+            <LogarLogo 
+              variant="full" 
+              light={true} 
+            />
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 text-xs text-[#C6CC81]">
-            <span className="w-2 h-2 rounded-full bg-[#95A823] animate-pulse"></span>
-            <span className="font-serif italic text-sm text-[#D9DF98]">Experience the Green of the City</span>
+          <div className="flex items-center gap-3">
+            <div className="hidden sm:flex items-center gap-2 text-xs text-[#C6CC81]">
+              <span className="w-2 h-2 rounded-full bg-[#95A823] animate-pulse"></span>
+              <span className="font-serif italic text-sm text-[#D9DF98]">
+                {branding.tagline || 'Experience the Green of the City'}
+              </span>
+            </div>
           </div>
         </div>
       </header>
@@ -72,17 +98,31 @@ export const LoginPage: React.FC<LoginPageProps> = ({ onLoginSuccess, onOpenSupe
             <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-[#95A823] via-[#C6CC81] to-[#FFBC7D]"></div>
 
             <div className="text-center mb-6">
-              <div className="w-14 h-14 rounded-2xl bg-[#231E1B] border-2 border-[#95A823] flex items-center justify-center mx-auto mb-3.5 shadow-md shadow-[#95A823]/20">
-                <LogarLogo variant="icon" className="w-9 h-9" />
+              <div className="relative inline-block">
+                <div 
+                  className={`w-16 h-16 flex items-center justify-center mx-auto mb-3.5 shadow-lg shadow-[#95A823]/30 p-2.5 transition-all ${getShapeClass(branding.logoShape)}`}
+                  style={{ backgroundColor: branding.bgColor || '#95A823' }}
+                >
+                  {branding.logoUrl ? (
+                    <img 
+                      src={branding.logoUrl} 
+                      alt={branding.brandTitle} 
+                      className="w-full h-full object-contain filter drop-shadow-xs" 
+                    />
+                  ) : (
+                    <HotelFlowerIcon className="w-full h-full" color="#FFFFFF" centerColor="#EAEEBB" />
+                  )}
+                </div>
               </div>
-              <h1 className="text-2xl font-black text-[#231E1B] tracking-tight">
-                MOD REPORT LOGAR
+
+              <h1 className="text-2xl font-black text-[#231E1B] tracking-tight uppercase">
+                {branding.brandTitle || 'MOD REPORT LOGAR'}
               </h1>
               <p className="text-xs text-[#70635A] mt-1 font-medium">
-                Sistem Pelaporan &amp; Monitoring Lapangan Manager on Duty
+                {branding.brandSubtitle || 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty'}
               </p>
               <p className="text-[11px] text-[#95A823] font-serif italic mt-0.5 font-bold">
-                Hotel Lombok Garden &bull; Mataram
+                Hotel {branding.brandTitle || 'Lombok Garden'} &bull; Mataram
               </p>
             </div>
 

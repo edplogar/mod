@@ -72,11 +72,27 @@ export interface HotelLocationConfig {
   isActive: boolean;
 }
 
+export type LogoShape = 'rounded' | 'circle' | 'square';
+
+export interface HotelBrandingConfig {
+  logoUrl?: string; // Base64 data URL or external image URL
+  logoShape: LogoShape; // 'rounded' | 'circle' | 'square'
+  bgColor: string; // Background color hex code, e.g. '#95A823'
+  tagline: string; // e.g. 'Experience the Green of the City'
+  brandTitle: string; // e.g. 'LOMBOK GARDEN'
+  brandSubtitle: string; // e.g. 'HOTEL • REPORT LOGAR'
+  badgeText: string; // e.g. 'MOD'
+  customIconType?: 'default_flower' | 'custom_image' | 'building' | 'shield' | 'leaf';
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface SystemSettings {
   hotelName: string;
   hotelAddress: string;
   hotelPhone: string;
   hotelEmail: string;
+  branding?: HotelBrandingConfig;
   driveFolderId: string;
   driveFolderName: string;
   driveWebhookUrl?: string;

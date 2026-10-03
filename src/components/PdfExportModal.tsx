@@ -6,11 +6,14 @@ import {
   CheckCircle2, 
   Calendar, 
   Layers, 
-  Sparkles 
+  Sparkles,
+  Eye
 } from 'lucide-react';
 import { ModReportItem, UserProfile } from '../types';
 import { exportModReportToPdf } from '../services/pdfExportService';
 import { INITIAL_OFFICERS, HOTEL_DEPARTMENTS } from '../data/initialData';
+import { getSystemSettings } from '../services/systemSettingsService';
+import { LogarLogo } from './LogarLogo';
 
 interface PdfExportModalProps {
   isOpen: boolean;
@@ -27,6 +30,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
 }) => {
   if (!isOpen) return null;
 
+  const settings = getSystemSettings();
   const [dateFilterType, setDateFilterType] = useState<'all' | 'custom' | 'september'>('september');
   const [startDate, setStartDate] = useState('9/1/2026');
   const [endDate, setEndDate] = useState('9/30/2026');
@@ -102,13 +106,35 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
 
         {/* Content */}
         <div className="p-6 space-y-4">
+          {/* Live Kop Preview */}
+          <div className="bg-[#231E1B] rounded-2xl p-3.5 text-white border border-[#3D352F] shadow-sm relative overflow-hidden">
+            <div 
+              className="absolute left-0 right-0 bottom-0 h-1" 
+              style={{ backgroundColor: settings.iconBgColor || '#95A823' }} 
+            />
+            <div className="flex items-center gap-3">
+              <LogarLogo variant="icon" className="w-9 h-9 shrink-0" />
+              <div className="min-w-0 flex-1">
+                <p className="font-extrabold text-xs tracking-wider uppercase text-white truncate">
+                  {settings.hotelName || 'HOTEL LOMBOK GARDEN'}
+                </p>
+                <p className="text-[10px] text-[#EAEEBB] italic truncate">
+                  {settings.hotelTagline || 'Experience the Green of the City'}
+                </p>
+                <p className="text-[9px] text-[#C6CC81] truncate">
+                  {settings.hotelAddress}
+                </p>
+              </div>
+            </div>
+          </div>
+
           <div className="bg-[#FAFBF5] border border-[#D9DF98] rounded-2xl p-3.5 text-xs text-[#61554D]">
             <p className="font-bold text-[#231E1B] flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-[#95A823]"></span>
               Format Dokumen Cetak Standar Manajemen LOGAR
             </p>
             <p className="text-[#70635A] mt-1">
-              Menghasilkan PDF siap cetak dengan kop surat resmi Hotel Lombok Garden, tabel temuan, status tindak lanjut, dan lembar tanda tangan General Manager.
+              Menghasilkan PDF siap cetak dengan kop surat resmi {settings.hotelName || 'Hotel Lombok Garden'}, logo/ikon aktif, tabel temuan, status tindak lanjut, dan lembar tanda tangan General Manager.
             </p>
           </div>
 

@@ -48,6 +48,8 @@ import type {
   SystemPermissionsState
 } from '../../types/index.ts';
 import { RolePermissionsManager } from './RolePermissionsManager.tsx';
+import { ChangeLogoModal } from '../ChangeLogoModal.tsx';
+import { LogarLogo } from '../LogarLogo.tsx';
 import { 
   getStoredPermissions, 
   subscribeToFirestorePermissions, 
@@ -138,6 +140,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   const [showScriptModal, setShowScriptModal] = useState(false);
   const [copiedScript, setCopiedScript] = useState(false);
   const [isSyncingPhotos, setIsSyncingPhotos] = useState(false);
+  const [isChangeLogoModalOpen, setIsChangeLogoModalOpen] = useState(false);
 
   // New location state
   const [newLocName, setNewLocName] = useState('');
@@ -974,6 +977,65 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
               <form onSubmit={handleSaveSettings} className="space-y-5">
                 {/* Hotel Metadata */}
+                {/* Brand Logo & Visual Emblem Customization Section */}
+                <div className="bg-gradient-to-r from-slate-800/90 via-[#231E1B]/90 to-slate-800/90 border border-[#95A823]/40 rounded-2xl p-5 space-y-4 shadow-xl">
+                  <div className="flex items-center justify-between flex-wrap gap-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-[#95A823] flex items-center justify-center text-white shadow-md">
+                        <Sparkles className="w-5 h-5 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white tracking-wide">
+                          Kustomisasi Logo &amp; Identitas Brand Hotel
+                        </h3>
+                        <p className="text-[11px] text-[#C6CC81]">
+                          Upload file logo baru (PNG/SVG/JPG), tautan Google Drive, bentuk &amp; palet warna properti
+                        </p>
+                      </div>
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => setIsChangeLogoModalOpen(true)}
+                      className="px-4 py-2 bg-[#95A823] hover:bg-[#7B8C1B] text-white font-bold text-xs rounded-xl shadow-md transition flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>Buka Pengubah Logo &amp; Ikon</span>
+                    </button>
+                  </div>
+
+                  <div className="bg-[#1A1614] border border-[#3D352F] rounded-2xl p-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <LogarLogo 
+                        variant="full" 
+                        light={true} 
+                        branding={settings.branding} 
+                        showEditButton={true} 
+                        onEdit={() => setIsChangeLogoModalOpen(true)} 
+                      />
+                    </div>
+
+                    <div className="flex items-center gap-3 text-xs text-slate-300">
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] text-slate-400">Bentuk Ikon:</p>
+                        <p className="font-bold text-[#EAEEBB] capitalize">{settings.branding?.logoShape || 'Rounded'}</p>
+                      </div>
+                      <div className="text-right hidden sm:block">
+                        <p className="text-[10px] text-slate-400">Warna Latar:</p>
+                        <p className="font-mono font-bold text-white">{settings.branding?.bgColor || '#95A823'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsChangeLogoModalOpen(true)}
+                        className="px-3 py-1.5 bg-[#2E2824] hover:bg-[#3B332E] text-[#EAEEBB] hover:text-white border border-[#453D37] rounded-xl text-xs font-semibold transition flex items-center gap-1"
+                      >
+                        <Edit3 className="w-3.5 h-3.5 text-[#95A823]" />
+                        <span>Kustomisasi</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="bg-slate-800/60 border border-slate-700/80 rounded-2xl p-5 space-y-4">
                   <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                     <Building2 className="w-4 h-4 text-emerald-400" />
@@ -2009,6 +2071,18 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </div>
         </div>
       )}
+
+      {/* Change Logo & Branding Modal */}
+      <ChangeLogoModal
+        isOpen={isChangeLogoModalOpen}
+        onClose={() => setIsChangeLogoModalOpen(false)}
+        currentUser={null}
+        onSuccess={(newBranding) => {
+          setSettings(prev => ({ ...prev, branding: newBranding }));
+          showToast('Logo & Identitas Brand Hotel berhasil diperbarui!');
+          if (onRefreshData) onRefreshData();
+        }}
+      />
     </div>
   );
 };

@@ -1,4 +1,4 @@
-import { SystemSettings, SystemAuditLog, HotelLocationConfig } from '../types/index.ts';
+import { SystemSettings, SystemAuditLog, HotelLocationConfig, HotelBrandingConfig } from '../types/index.ts';
 import { HOTEL_LOCATIONS, HOTEL_DEPARTMENTS, RAW_MOD_CSV, parseCSVToReports } from '../data/initialData';
 import { saveReports, saveSyncConfig } from './storageService';
 import { saveAllUsers, INITIAL_HOTEL_USERS } from './authService';
@@ -8,11 +8,23 @@ import { saveSettingsToFirestore, addAuditLogToFirestore } from './firebase';
 const SETTINGS_STORAGE_KEY = 'mod_report_system_settings_v1';
 const AUDIT_LOG_STORAGE_KEY = 'mod_report_system_audit_logs_v1';
 
+export const DEFAULT_BRANDING: HotelBrandingConfig = {
+  logoUrl: '',
+  logoShape: 'rounded',
+  bgColor: '#95A823',
+  tagline: 'Experience the Green of the City',
+  brandTitle: 'LOMBOK GARDEN',
+  brandSubtitle: 'HOTEL • REPORT LOGAR',
+  badgeText: 'MOD',
+  customIconType: 'default_flower',
+};
+
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   hotelName: 'Hotel Lombok Garden',
   hotelAddress: 'Jl. Bung Karno No. 7, Mataram, Nusa Tenggara Barat 83127',
   hotelPhone: '(0370) 636015 / +62 811-390-001',
   hotelEmail: 'hotellombokgarden@gmail.com',
+  branding: DEFAULT_BRANDING,
   driveFolderId: '1LG_MOD_DRIVE_FOLDER_2026',
   driveFolderName: 'HOTEL LOMBOK GARDEN / MOD REPORTS 2026',
   driveWebhookUrl: '',
@@ -57,13 +69,42 @@ export function getSystemSettings(): SystemSettings {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      return { ...DEFAULT_SYSTEM_SETTINGS, ...parsed };
+      return { 
+        ...DEFAULT_SYSTEM_SETTINGS, 
+        ...parsed,
+        branding: {
+          ...DEFAULT_BRANDING,
+          ...(parsed.branding || {})
+        }
+      };
     }
   } catch (e) {
     console.error('Failed loading system settings', e);
   }
   saveSystemSettings(DEFAULT_SYSTEM_SETTINGS);
   return DEFAULT_SYSTEM_SETTINGS;
+}
+
+export function getHotelBranding(): HotelBrandingConfig {
+  const settings = getSystemSettings();
+  return settings.branding || DEFAULT_BRANDING;
+}
+
+export function updateHotelBranding(brandingUpdates: Partial<HotelBrandingConfig>, actor: string = 'Super Admin'): SystemSettings {
+  const currentSettings = getSystemSettings();
+  const currentBranding = currentSettings.branding || DEFAULT_BRANDING;
+  
+  const updatedBranding: HotelBrandingConfig = {
+    ...currentBranding,
+    ...brandingUpdates,
+    updatedAt: new Date().toISOString(),
+    updatedBy: actor,
+  };
+
+  return updateSystemSettings({
+    branding: updatedBranding,
+    hotelName: updatedBranding.brandTitle ? `Hotel ${updatedBranding.brandTitle}` : currentSettings.hotelName,
+  }, actor);
 }
 
 export function saveSystemSettings(settings: SystemSettings): void {

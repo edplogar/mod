@@ -37,6 +37,7 @@ interface NavbarProps {
   onOpenCloudSync: () => void;
   onOpenAuth: () => void;
   onOpenSuperAdmin: () => void;
+  onOpenChangeLogo?: () => void;
   isSuperAdminAuth: boolean;
   onLogout?: () => void;
 }
@@ -53,6 +54,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenCloudSync,
   onOpenAuth,
   onOpenSuperAdmin,
+  onOpenChangeLogo,
   isSuperAdminAuth,
   onLogout,
 }) => {
@@ -144,7 +146,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 className="flex items-center gap-2 cursor-pointer overflow-hidden min-w-0 flex-1" 
                 onClick={() => handleTabChange('dashboard')}
               >
-                <LogarLogo variant="full" light={true} />
+                <LogarLogo 
+                  variant="full" 
+                  light={true} 
+                  showEditButton={perms.canAccessSuperAdmin && Boolean(onOpenChangeLogo)} 
+                  onEdit={perms.canAccessSuperAdmin ? onOpenChangeLogo : undefined} 
+                />
               </div>
             ) : (
               <div 
@@ -155,7 +162,12 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
                 title="Buka Menu Navigasi Lengkap"
               >
-                <LogarLogo variant="icon" className="w-10 h-10 hover:scale-105 transition-transform" />
+                <LogarLogo 
+                  variant="icon" 
+                  className="w-10 h-10 hover:scale-105 transition-transform" 
+                  showEditButton={perms.canAccessSuperAdmin && Boolean(onOpenChangeLogo)} 
+                  onEdit={perms.canAccessSuperAdmin ? onOpenChangeLogo : undefined} 
+                />
               </div>
             )}
 
@@ -355,6 +367,25 @@ export const Navbar: React.FC<NavbarProps> = ({
                       <p className="text-[10px] text-[#70635A] font-normal truncate">
                         {syncState.isSyncing ? 'Menyinkronkan...' : 'Google Drive & Firestore'}
                       </p>
+                    </div>
+                  )}
+                </button>
+              )}
+
+              {/* Ganti Logo & Kustomisasi Brand - ONLY FOR SUPER ADMIN */}
+              {perms.canAccessSuperAdmin && onOpenChangeLogo && (
+                <button
+                  onClick={() => handleActionClick(onOpenChangeLogo)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl text-xs font-bold transition-all bg-[#2E2824] hover:bg-[#3B332E] text-[#EAEEBB] hover:text-white border border-[#453D37] hover:border-[#95A823] ${
+                    !isExpanded ? 'justify-center px-0' : ''
+                  }`}
+                  title="Ganti Logo & Ikon Hotel Lombok Garden (Khusus Super Admin)"
+                >
+                  <Sparkles className="w-4 h-4 text-[#95A823] shrink-0" />
+                  {isExpanded && (
+                    <div className="text-left flex-1 truncate">
+                      <p className="leading-tight truncate text-white">Ganti Logo &amp; Ikon</p>
+                      <p className="text-[10px] text-[#C6CC81] font-normal truncate">Khusus Super Admin</p>
                     </div>
                   )}
                 </button>

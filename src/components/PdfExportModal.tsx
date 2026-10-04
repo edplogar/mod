@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { ModReportItem, UserProfile } from '../types';
 import { exportModReportToPdf } from '../services/pdfExportService';
-import { INITIAL_OFFICERS, HOTEL_DEPARTMENTS } from '../data/initialData';
+import { INITIAL_OFFICERS, HOTEL_DEPARTMENTS, isDateOnOrAfterOctober2026 } from '../data/initialData';
 import { getSystemSettings } from '../services/systemSettingsService';
 import { LogarLogo } from './LogarLogo';
 
@@ -31,18 +31,22 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
   if (!isOpen) return null;
 
   const settings = getSystemSettings();
-  const [dateFilterType, setDateFilterType] = useState<'all' | 'custom' | 'september'>('september');
-  const [startDate, setStartDate] = useState('9/1/2026');
-  const [endDate, setEndDate] = useState('9/30/2026');
+  const [dateFilterType, setDateFilterType] = useState<'all' | 'custom' | 'oktober'>('oktober');
+  const [startDate, setStartDate] = useState('10/1/2026');
+  const [endDate, setEndDate] = useState('10/31/2026');
   const [shiftFilter, setShiftFilter] = useState<string>('all');
   const [officerFilter, setOfficerFilter] = useState<string>('all');
   const [deptFilter, setDeptFilter] = useState<string>('all');
 
-  // Filter reports according to choices
+  // Filter reports according to choices (enforcing data >= October 2026)
   const filteredReports = useMemo(() => {
     return reports.filter(r => {
-      if (dateFilterType === 'september') {
-        if (!r.date.startsWith('9/')) return false;
+      // Must be on or after October 2026
+      if (!isDateOnOrAfterOctober2026(r.date || r.timestamp)) return false;
+
+      if (dateFilterType === 'oktober') {
+        const clean = (r.date || r.timestamp).trim().split(' ')[0];
+        if (!clean.startsWith('10/') && !clean.startsWith('10-') && !clean.startsWith('2026-10')) return false;
       } else if (dateFilterType === 'custom') {
         if (startDate && endDate) {
           // simple check
@@ -69,8 +73,8 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
     exportModReportToPdf(filteredReports, {
       title: 'MOD REPORT LOGAR',
       shift: shiftFilter !== 'all' ? shiftFilter : 'Semua Shift Operasional',
-      startDate: dateFilterType === 'september' ? '1 Sep 2026' : (dateFilterType === 'custom' ? startDate : undefined),
-      endDate: dateFilterType === 'september' ? '30 Sep 2026' : (dateFilterType === 'custom' ? endDate : undefined),
+      startDate: dateFilterType === 'oktober' ? '1 Okt 2026' : (dateFilterType === 'custom' ? startDate : undefined),
+      endDate: dateFilterType === 'oktober' ? '31 Okt 2026' : (dateFilterType === 'custom' ? endDate : undefined),
       officerName: officerFilter !== 'all' ? officerFilter : undefined,
       departmentFilter: deptFilter !== 'all' ? deptFilter : undefined,
       user: currentUser,
@@ -110,7 +114,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
           <div className="bg-[#231E1B] rounded-2xl p-3.5 text-white border border-[#3D352F] shadow-sm relative overflow-hidden">
             <div 
               className="absolute left-0 right-0 bottom-0 h-1" 
-              style={{ backgroundColor: settings.iconBgColor || '#95A823' }} 
+              style={{ backgroundColor: settings.branding?.bgColor || '#95A823' }} 
             />
             <div className="flex items-center gap-3">
               <LogarLogo variant="icon" className="w-9 h-9 shrink-0" />
@@ -119,7 +123,7 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
                   {settings.hotelName || 'HOTEL LOMBOK GARDEN'}
                 </p>
                 <p className="text-[10px] text-[#EAEEBB] italic truncate">
-                  {settings.hotelTagline || 'Experience the Green of the City'}
+                  {settings.branding?.tagline || 'Experience the Green of the City'}
                 </p>
                 <p className="text-[9px] text-[#C6CC81] truncate">
                   {settings.hotelAddress}
@@ -146,14 +150,14 @@ export const PdfExportModal: React.FC<PdfExportModalProps> = ({
             <div className="grid grid-cols-3 gap-2 text-xs">
               <button
                 type="button"
-                onClick={() => setDateFilterType('september')}
+                onClick={() => setDateFilterType('oktober')}
                 className={`py-2 px-2.5 rounded-xl font-bold border text-center transition ${
-                  dateFilterType === 'september'
+                  dateFilterType === 'oktober'
                     ? 'bg-[#95A823] text-white border-[#95A823] shadow-xs'
                     : 'bg-[#FAFBF5] text-[#70635A] border-[#D9DF98] hover:bg-[#F4F6EA]'
                 }`}
               >
-                Bulan Ini (Sep 2026)
+                Bulan Ini (Okt 2026)
               </button>
               <button
                 type="button"

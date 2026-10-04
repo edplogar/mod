@@ -19,6 +19,7 @@ import type {
   RolePermissionConfig
 } from '../types/index.ts';
 import { getUserPermissions } from '../services/permissionService.ts';
+import { isDateOnOrAfterOctober2026 } from '../data/initialData';
 import { 
   calculateStorageSavings 
 } from '../services/storageService';
@@ -52,6 +53,45 @@ ChartJS.register(
   Filler
 );
 
+const INDONESIAN_MONTHS = [
+  'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+  'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+];
+
+export function getReportMonthYear(dateStr: string): { month: number; year: number; key: string; label: string } | null {
+  if (!dateStr) return null;
+  const clean = dateStr.trim().split(' ')[0];
+  const parts = clean.split(/[\/\-]/);
+  let month = 0;
+  let year = 0;
+
+  if (parts.length >= 3) {
+    if (parts[0].length === 4) {
+      year = parseInt(parts[0], 10);
+      month = parseInt(parts[1], 10);
+    } else {
+      month = parseInt(parts[0], 10);
+      year = parseInt(parts[2], 10);
+    }
+  } else {
+    const d = new Date(dateStr);
+    if (!isNaN(d.getTime())) {
+      year = d.getFullYear();
+      month = d.getMonth() + 1;
+    }
+  }
+
+  if (month >= 1 && month <= 12 && year >= 2000) {
+    return {
+      month,
+      year,
+      key: `${month}/${year}`,
+      label: `${INDONESIAN_MONTHS[month - 1]} ${year}`,
+    };
+  }
+  return null;
+}
+
 interface DashboardViewProps {
   reports: ModReportItem[];
   currentUser: UserProfile;
@@ -68,13 +108,56 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onOpenNewReport,
 }) => {
   const perms = userPermissions || getUserPermissions(currentUser);
+
+  // Enforce removal of all records prior to October 2026
+  const postOctoberReports = useMemo(() => {
+    return reports.filter(r => isDateOnOrAfterOctober2026(r.date || r.timestamp));
+  }, [reports]);
+
+  // Dynamically extract month list from valid reports (>= October 2026), guaranteeing active October 2026 is present
+  const availableMonths = useMemo(() => {
+    const monthMap = new Map<string, { key: string; label: string; year: number; month: number }>();
+    
+    // Always guarantee current active month October 2026 is available
+    monthMap.set('10/2026', {
+      key: '10/2026',
+      label: 'Oktober 2026',
+      year: 2026,
+      month: 10,
+    });
+
+    // Extract any additional months from post-October reports
+    postOctoberReports.forEach(r => {
+      const my = getReportMonthYear(r.date || r.timestamp);
+      if (my && (my.year > 2026 || (my.year === 2026 && my.month >= 10))) {
+        if (!monthMap.has(my.key)) {
+          monthMap.set(my.key, {
+            key: my.key,
+            label: my.label,
+            year: my.year,
+            month: my.month,
+          });
+        }
+      }
+    });
+
+    // Sort in reverse chronological order (newest first)
+    return Array.from(monthMap.values()).sort((a, b) => {
+      if (a.year !== b.year) return b.year - a.year;
+      return b.month - a.month;
+    });
+  }, [postOctoberReports]);
+
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
-  // Filtered reports by month if selected
+  // Filtered reports by selected month
   const activeReports = useMemo(() => {
-    if (selectedMonth === 'all') return reports;
-    return reports.filter(r => r.date.startsWith(selectedMonth + '/'));
-  }, [reports, selectedMonth]);
+    if (selectedMonth === 'all') return postOctoberReports;
+    return postOctoberReports.filter(r => {
+      const my = getReportMonthYear(r.date || r.timestamp);
+      return my && my.key === selectedMonth;
+    });
+  }, [postOctoberReports, selectedMonth]);
 
   // KPI Calculations
   const stats = useMemo(() => {
@@ -98,17 +181,17 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     };
   }, [activeReports]);
 
-  // Inspection Volume Over Months
+  // Inspection Volume Over Months (Starting from October 2026)
   const monthlyTrendData = useMemo(() => {
-    const months = ['12/2025', '1/2026', '2/2026', '3/2026', '4/2026', '5/2026', '6/2026', '7/2026', '8/2026', '9/2026'];
+    const months = ['10/2026', '11/2026', '12/2026', '1/2027', '2/2027', '3/2027'];
+    const monthLabels = ['Okt 2026', 'Nov 2026', 'Des 2026', 'Jan 2027', 'Feb 2027', 'Mar 2027'];
     const safeCounts = new Array(months.length).fill(0);
     const issueCounts = new Array(months.length).fill(0);
 
-    reports.forEach(r => {
-      const parts = r.date.split('/');
-      if (parts.length >= 3) {
-        const key = `${parts[0]}/${parts[2]}`;
-        const idx = months.indexOf(key);
+    postOctoberReports.forEach(r => {
+      const my = getReportMonthYear(r.date || r.timestamp);
+      if (my) {
+        const idx = months.indexOf(my.key);
         if (idx !== -1) {
           if (r.status === 'Aman' || r.status === 'Selesai') {
             safeCounts[idx]++;
@@ -118,12 +201,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         }
       }
     });
-
-    const monthLabels = [
-      'Des 2025', 'Jan 2026', 'Feb 2026', 'Mar 2026', 
-      'Apr 2026', 'Mei 2026', 'Jun 2026', 'Jul 2026', 
-      'Agu 2026', 'Sep 2026'
-    ];
 
     return {
       labels: monthLabels,
@@ -152,7 +229,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         },
       ],
     };
-  }, [reports]);
+  }, [postOctoberReports]);
 
   // Locations Distribution (Top 8 locations)
   const locationBarData = useMemo(() => {
@@ -303,17 +380,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onChange={(e) => setSelectedMonth(e.target.value)}
               className="bg-transparent text-xs font-bold text-[#231E1B] focus:outline-none cursor-pointer"
             >
-              <option value="all">Semua Periode (Total)</option>
-              <option value="9">September 2026</option>
-              <option value="8">Agustus 2026</option>
-              <option value="7">Juli 2026</option>
-              <option value="6">Juni 2026</option>
-              <option value="5">Mei 2026</option>
-              <option value="4">April 2026</option>
-              <option value="3">Maret 2026</option>
-              <option value="2">Februari 2026</option>
-              <option value="1">Januari 2026</option>
-              <option value="12">Desember 2025</option>
+              <option value="all">Semua Periode (Mulai Okt 2026)</option>
+              {availableMonths.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.label}
+                </option>
+              ))}
             </select>
           </div>
 

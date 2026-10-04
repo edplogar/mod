@@ -1,5 +1,5 @@
 import { ModReportItem, CloudSyncState, PictureItem } from '../types/index.ts';
-import { parseCSVToReports, RAW_MOD_CSV } from '../data/initialData';
+import { parseCSVToReports, RAW_MOD_CSV, isDateOnOrAfterOctober2026 } from '../data/initialData';
 import { getSystemSettings } from './systemSettingsService';
 import { syncAllPhotosToDrive, extractDriveFolderId, getDriveFolderUrl } from './driveSyncService';
 import { batchSyncReportsToFirestore, saveReportToFirestore, clearAllReportsFromFirestore } from './firebase';
@@ -13,15 +13,21 @@ export function loadReports(): ModReportItem[] {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw !== null) {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        return parsed;
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Enforce removal of all reports prior to October 2026
+        const valid = parsed.filter(r => isDateOnOrAfterOctober2026(r.date || r.timestamp));
+        if (valid.length > 0) {
+          return valid;
+        }
       }
     }
   } catch (e) {
     console.error('Error loading reports from localStorage', e);
   }
 
-  return [];
+  const initial = parseCSVToReports(RAW_MOD_CSV);
+  saveReports(initial);
+  return initial;
 }
 
 export function saveReports(reports: ModReportItem[]): void {

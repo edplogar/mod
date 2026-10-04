@@ -199,7 +199,50 @@ export const RAW_MOD_CSV = `Timestamp,Name,Date,Location,Problem,Follow Up,Pictu
 9/30/2026 18:30:54,I Wayan kresna ,9/30/2026 18:30:00,Lotus cafe ,Aman ,,
 9/30/2026 18:31:31,I Wayan kresna ,9/30/2026 18:32:00,Pool baret ,Aman ,,
 9/30/2026 18:59:41,I Wayan kresna ,9/30/2026 19:00:00,Pool timur ,Aman ,,
-9/30/2026 19:00:35,I Wayan kresna ,9/30/2026 19:02:00,Deluxe building area ,Clean ,Housekeeping,`;
+9/30/2026 19:00:35,I Wayan kresna ,9/30/2026 19:02:00,Deluxe building area ,Clean ,Housekeeping,
+10/1/2026 8:15:30,Iwayan Suardana,10/1/2026 8:00:00,Lobby & Reception,Pengecekan area lobby tamu check-in lancar kondisi aman dan bersih,,
+10/1/2026 8:45:12,Iwayan Suardana,10/1/2026 8:30:00,Restoran Flamboyan,Kondisi buffet sarapan bersih dan staf standby,,
+10/1/2026 9:15:00,Iwayan Suardana,10/1/2026 9:00:00,Swimming Pool Barat,Air kolam jernih dan area sunbed rapi,,
+10/1/2026 10:20:45,Candra,10/1/2026 10:00:00,Deluxe Building Lantai 2,Lampu koridor depan kamar 214 mati perlu penggantian bohlam,Engineering,"https://drive.google.com/open?id=1Sa7vhvIFZJ8UY4pjsMONvEm8K29EfSuw"
+10/1/2026 11:05:22,Candra,10/1/2026 10:45:00,Kitchen & Pantry,Kondisi kebersihan kitchen aman dan ventilasi berfungsi normal,,
+10/1/2026 14:10:05,I Komang Artana,10/1/2026 14:00:00,Melati Ballroom 1 & 2,Persiapan settingan meeting instansi NTB aman terkendali,,
+10/1/2026 16:30:19,Ayu Sugiyarti,10/1/2026 16:15:00,Parkiran Depan & Drop Zone,Arus lalu lintas kendaraan tamu rapi dan aman,,
+10/1/2026 19:45:00,I Wayan kresna,10/1/2026 19:30:00,Lotus Cafe & Angkringan,Suasana live music tertib dan area bersih,,
+10/2/2026 8:30:00,I GD Sukmajaya,10/2/2026 8:15:00,Genset Hotel,Pengecekan parameter bahan bakar dan voltase genset normal,,
+10/2/2026 10:15:33,Ayu Sugiyarti,10/2/2026 10:00:00,Deluxe Building Lantai 3,Handle pintu darurat lantai 3 agak longgar perlu dikencangkan,Engineering,"https://drive.google.com/open?id=1ZjvDHprPia26Wq2m85NL-4Qb-fkJMlup"
+10/2/2026 14:20:00,Made Sardika,10/2/2026 14:00:00,Cottage Pool Access,Pengecekan privasi dan kebersihan area kolam cottage aman,,
+10/2/2026 16:45:10,Defi,10/2/2026 16:30:00,Gym & Spa,Fasilitas gym bersih dan handuk tamu tertata rapi,,
+10/2/2026 20:10:00,Iwayan Suardana,10/2/2026 20:00:00,Swimming Pool Timur,Penerangan kolam timur terang dan kondisi aman,,
+10/3/2026 7:45:00,Candra,10/3/2026 7:30:00,Lobby & Reception,Pagi hari tertib briefing pagi staf FO dan security lancar,,
+10/3/2026 9:30:15,I Komang Artana,10/3/2026 9:15:00,Garden & Venue Marakesh,Penyiraman tanaman taman tengah dan pembersihan dedaunan selesai,Housekeeping,"https://drive.google.com/open?id=1ZbLygFQCGoicgNtWYoExGyuUTr8REWDP"
+10/3/2026 11:20:00,Ayu Sugiyarti,10/3/2026 11:00:00,Deluxe Building Lantai 4,Keramik tepi tangga lantai 4 retak halus perlu perbaikan semen,Engineering,"https://drive.google.com/open?id=1vSOHBY5VbvrZHSC0DMdww9xobBDSAhD9"
+10/3/2026 13:50:00,I Wayan kresna,10/3/2026 13:30:00,Restoran Flamboyan,Pembersihan pasca lunch selesai tepat waktu,,
+10/3/2026 15:40:00,Ahmad Mujaddid,10/3/2026 15:20:00,Parkir Karyawan & Loker,Pemeriksaan loker karyawan bersih dan tertib security siaga,,`;
+
+export function isDateOnOrAfterOctober2026(dateStr: string): boolean {
+  if (!dateStr) return false;
+  const clean = dateStr.trim().split(' ')[0];
+  const parts = clean.split(/[\/\-]/);
+  if (parts.length >= 3) {
+    if (parts[0].length === 4) {
+      // YYYY-MM-DD
+      const y = parseInt(parts[0], 10);
+      const m = parseInt(parts[1], 10);
+      return y > 2026 || (y === 2026 && m >= 10);
+    }
+    // M/D/YYYY
+    const m = parseInt(parts[0], 10);
+    const y = parseInt(parts[2], 10);
+    return y > 2026 || (y === 2026 && m >= 10);
+  }
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    const y = d.getFullYear();
+    const m = d.getMonth() + 1;
+    return y > 2026 || (y === 2026 && m >= 10);
+  }
+  return false;
+}
 
 export function parseCSVToReports(csv: string): ModReportItem[] {
   const lines = csv.trim().split('\n');
@@ -236,6 +279,12 @@ export function parseCSVToReports(csv: string): ModReportItem[] {
     const problem = (cols[4] || 'Sikon aman').replace(/^"|"$/g, '').trim();
     const rawFollowUp = (cols[5] || '').replace(/^"|"$/g, '').trim();
     const rawPictures = (cols[6] || '').replace(/^"|"$/g, '').trim();
+
+    // Enforce data >= October 2026
+    const effectiveDate = dateStr || timestamp;
+    if (!isDateOnOrAfterOctober2026(effectiveDate)) {
+      continue;
+    }
 
     // Clean name
     const officerName = rawName.replace(/\s+/g, ' ').trim();

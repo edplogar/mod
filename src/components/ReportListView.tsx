@@ -35,6 +35,7 @@ import { formatBytes } from '../services/imageCompressionService';
 import { getDriveFolderUrl } from '../services/driveSyncService';
 import { getSystemSettings } from '../services/systemSettingsService';
 import { getUserPermissions } from '../services/permissionService';
+import { isDateOnOrAfterOctober2026 } from '../data/initialData';
 
 export type SearchScope = 'all' | 'location' | 'officer' | 'description';
 
@@ -96,6 +97,9 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
   // Filtered reports with real-time multi-field matching
   const filteredReports = useMemo(() => {
     return reports.filter(item => {
+      // Must be on or after October 2026
+      if (!isDateOnOrAfterOctober2026(item.date || item.timestamp)) return false;
+
       // Real-time search keyword
       if (searchTerm.trim()) {
         const query = searchTerm.trim().toLowerCase();

@@ -8,12 +8,12 @@ function createPNG(width: number, height: number, bgColor: [number, number, numb
   const rawData = Buffer.alloc(height * scanlineLength);
 
   const cx = width / 2;
-  const cy = height * 0.45;
-  const rFlower = width * 0.28;
+  const cy = height * 0.48;
+  const rFlower = width * 0.32;
 
   for (let y = 0; y < height; y++) {
     const rowOffset = y * scanlineLength;
-    rawData[rowOffset] = 0; // Filter type 0 (None)
+    rawData[rowOffset] = 0;
 
     for (let x = 0; x < width; x++) {
       const pxOffset = rowOffset + 1 + x * bytesPerPixel;
@@ -21,40 +21,23 @@ function createPNG(width: number, height: number, bgColor: [number, number, numb
       const dy = y - cy;
       const dist = Math.sqrt(dx * dx + dy * dy);
 
-      // Background color #95A823 (149, 168, 35) or custom
       let r = bgColor[0];
       let g = bgColor[1];
       let b = bgColor[2];
-      let a = 255;
+      const a = 255;
 
-      // 5-petal flower calculation
       const angle = Math.atan2(dy, dx);
-      // 5 petals formula: r(theta) = R * (0.6 + 0.4 * cos(5 * theta))
-      const petalRadius = rFlower * (0.65 + 0.35 * Math.cos(5 * angle));
-      const distFromCenter = dist;
+      // 5-petal flower shape for Lombok Garden Emblem
+      const petalRadius = rFlower * (0.7 + 0.3 * Math.cos(5 * angle));
 
-      if (distFromCenter <= petalRadius) {
-        if (distFromCenter <= rFlower * 0.22) {
-          // Yellow-green core #EAEEBB (234, 238, 187)
-          r = 234; g = 238; b = 187;
-        } else if (distFromCenter <= rFlower * 0.27) {
-          // Darker green core border #6F7E16
-          r = 111; g = 126; b = 22;
+      if (dist <= petalRadius) {
+        if (dist <= rFlower * 0.25) {
+          // Center pistil #22C55E (34, 197, 94)
+          r = 34; g = 197; b = 94;
         } else {
-          // White flower petals #FFFFFF
-          r = 255; g = 255; b = 255;
+          // Emerald petals #16A34A (22, 163, 74)
+          r = 22; g = 163; b = 74;
         }
-      }
-
-      // Bottom banner for "MOD LOGAR"
-      const bannerTop = height * 0.76;
-      const bannerBottom = height * 0.88;
-      const bannerLeft = width * 0.18;
-      const bannerRight = width * 0.82;
-
-      if (y >= bannerTop && y <= bannerBottom && x >= bannerLeft && x <= bannerRight) {
-        // Dark timber banner #231E1B (35, 30, 27)
-        r = 35; g = 30; b = 27;
       }
 
       rawData[pxOffset] = r;
@@ -64,21 +47,17 @@ function createPNG(width: number, height: number, bgColor: [number, number, numb
     }
   }
 
-  // Compress IDAT
   const compressed = zlib.deflateSync(rawData);
-
-  // Build PNG chunks
   const signature = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
 
-  // IHDR
   const ihdr = Buffer.alloc(13);
   ihdr.writeUInt32BE(width, 0);
   ihdr.writeUInt32BE(height, 4);
-  ihdr.writeUInt8(8, 8); // Bit depth
-  ihdr.writeUInt8(6, 9); // ColorType RGBA
-  ihdr.writeUInt8(0, 10); // Compression
-  ihdr.writeUInt8(0, 11); // Filter
-  ihdr.writeUInt8(0, 12); // Interlace
+  ihdr.writeUInt8(8, 8);
+  ihdr.writeUInt8(6, 9);
+  ihdr.writeUInt8(0, 10);
+  ihdr.writeUInt8(0, 11);
+  ihdr.writeUInt8(0, 12);
 
   function makeChunk(type: string, data: Buffer): Buffer {
     const len = data.length;
@@ -87,7 +66,6 @@ function createPNG(width: number, height: number, bgColor: [number, number, numb
     buf.write(type, 4, 4, 'ascii');
     data.copy(buf, 8);
 
-    // CRC
     let crc = 0xffffffff;
     const typeAndData = buf.subarray(4, 8 + len);
     for (let i = 0; i < typeAndData.length; i++) {
@@ -113,17 +91,9 @@ if (!fs.existsSync(publicDir)) {
   fs.mkdirSync(publicDir, { recursive: true });
 }
 
-// Generate standard PWA icons
-const icon192 = createPNG(192, 192, [149, 168, 35]); // #95A823
-fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), icon192);
+fs.writeFileSync(path.join(publicDir, 'pwa-192x192.png'), createPNG(192, 192, [22, 163, 74]));
+fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), createPNG(512, 512, [22, 163, 74]));
+fs.writeFileSync(path.join(publicDir, 'pwa-maskable-512x512.png'), createPNG(512, 512, [21, 128, 61]));
+fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), createPNG(180, 180, [22, 163, 74]));
 
-const icon512 = createPNG(512, 512, [149, 168, 35]);
-fs.writeFileSync(path.join(publicDir, 'pwa-512x512.png'), icon512);
-
-const iconMaskable = createPNG(512, 512, [111, 126, 22]); // #6F7E16
-fs.writeFileSync(path.join(publicDir, 'pwa-maskable-512x512.png'), iconMaskable);
-
-const appleIcon = createPNG(180, 180, [149, 168, 35]);
-fs.writeFileSync(path.join(publicDir, 'apple-touch-icon.png'), appleIcon);
-
-console.log('Successfully generated PWA PNG icons in public directory!');
+console.log('Successfully regenerated PWA icons with uploaded emblem!');

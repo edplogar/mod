@@ -9,9 +9,9 @@ const SETTINGS_STORAGE_KEY = 'mod_report_system_settings_v1';
 const AUDIT_LOG_STORAGE_KEY = 'mod_report_system_audit_logs_v1';
 
 export const DEFAULT_BRANDING: HotelBrandingConfig = {
-  logoUrl: '',
+  logoUrl: '/logo-emblem.svg',
   logoShape: 'rounded',
-  bgColor: '#95A823',
+  bgColor: '#16A34A',
   tagline: 'Experience the Green of the City',
   brandTitle: 'LOMBOK GARDEN',
   brandSubtitle: 'HOTEL • REPORT LOGAR',

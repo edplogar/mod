@@ -24,6 +24,7 @@ import {
 import type { UserProfile, CloudSyncState, RolePermissionConfig } from '../types/index.ts';
 import { LogarLogo } from './LogarLogo';
 import { getUserPermissions } from '../services/permissionService.ts';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
 
 interface NavbarProps {
   activeTab: 'dashboard' | 'reports';
@@ -411,6 +412,11 @@ export const Navbar: React.FC<NavbarProps> = ({
                   )}
                 </button>
               )}
+
+              {/* PWA Install Button in Sidebar */}
+              <div className={!isExpanded ? 'flex justify-center' : 'w-full'}>
+                <PWAInstallButton compact={!isExpanded} />
+              </div>
             </div>
           )}
 

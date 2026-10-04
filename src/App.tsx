@@ -48,6 +48,7 @@ import { AuthModal } from './components/AuthModal';
 import { SuperAdminDashboard } from './components/admin/SuperAdminDashboard';
 import { SuperAdminLoginModal } from './components/admin/SuperAdminLoginModal';
 import { ChangeLogoModal } from './components/ChangeLogoModal';
+import { OfflineIndicator } from './components/pwa/OfflineIndicator';
 import { 
   Building2, 
   CheckCircle, 
@@ -414,6 +415,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#FAFBF5] text-[#231E1B] flex flex-col font-sans">
+      <OfflineIndicator />
       {/* Toast Banner */}
       {toastMessage && (
         <div className="fixed bottom-5 right-5 z-50 bg-[#231E1B] text-[#FAFBF5] px-4 py-3 rounded-2xl shadow-2xl border border-[#95A823]/50 flex items-center gap-2.5 text-xs animate-bounce font-medium">

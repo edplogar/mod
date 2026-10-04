@@ -15,6 +15,8 @@ import { authenticateUser } from '../services/authService';
 import { fetchFullDatabaseSync } from '../services/liveSyncService';
 import { getHotelBranding } from '../services/systemSettingsService';
 import { LogarLogo, HotelFlowerIcon, getShapeClass } from './LogarLogo';
+import { PWAInstallButton } from './pwa/PWAInstallButton';
+import { OfflineIndicator } from './pwa/OfflineIndicator';
 
 interface LoginPageProps {
   onLoginSuccess: (user: UserProfile) => void;
@@ -79,6 +81,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
 
           <div className="flex items-center gap-3">
+            <PWAInstallButton compact={true} />
             <div className="hidden sm:flex items-center gap-2 text-xs text-[#C6CC81]">
               <span className="w-2 h-2 rounded-full bg-[#95A823] animate-pulse"></span>
               <span className="font-serif italic text-sm text-[#D9DF98]">
@@ -88,6 +91,8 @@ export const LoginPage: React.FC<LoginPageProps> = ({
           </div>
         </div>
       </header>
+
+      <OfflineIndicator />
 
       {/* Main Login Container */}
       <main className="flex-1 flex items-center justify-center p-4 sm:p-6 lg:p-8">

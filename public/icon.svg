@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="logarBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#95A823" />
+      <stop offset="100%" stop-color="#6F7E16" />
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000000" flood-opacity="0.3" />
+    </filter>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="112" fill="url(#logarBg)" />
+  
+  <!-- Outer subtle floral aura ring -->
+  <circle cx="256" cy="235" r="148" fill="none" stroke="#EAEEBB" stroke-width="6" stroke-opacity="0.4" stroke-dasharray="12 8" />
+  
+  <!-- Hotel Lombok Garden 5-Petal Flower Emblem -->
+  <g filter="url(#shadow)" transform="translate(256, 235)">
+    <!-- Petal 1 (Top) -->
+    <path d="M0,0 C-26,-46 -26,-92 0,-115 C26,-92 26,-46 0,0 Z" fill="#FFFFFF" />
+    <!-- Petal 2 (Top Right) -->
+    <g transform="rotate(72)">
+      <path d="M0,0 C-26,-46 -26,-92 0,-115 C26,-92 26,-46 0,0 Z" fill="#FFFFFF" />
+    </g>
+    <!-- Petal 3 (Bottom Right) -->
+    <g transform="rotate(144)">
+      <path d="M0,0 C-26,-46 -26,-92 0,-115 C26,-92 26,-46 0,0 Z" fill="#FFFFFF" />
+    </g>
+    <!-- Petal 4 (Bottom Left) -->
+    <g transform="rotate(216)">
+      <path d="M0,0 C-26,-46 -26,-92 0,-115 C26,-92 26,-46 0,0 Z" fill="#FFFFFF" />
+    </g>
+    <!-- Petal 5 (Top Left) -->
+    <g transform="rotate(288)">
+      <path d="M0,0 C-26,-46 -26,-92 0,-115 C26,-92 26,-46 0,0 Z" fill="#FFFFFF" />
+    </g>
+    
+    <!-- Flower Center Core -->
+    <circle cx="0" cy="0" r="32" fill="#EAEEBB" stroke="#95A823" stroke-width="4" />
+    <circle cx="0" cy="0" r="14" fill="#6F7E16" />
+  </g>
+  
+  <!-- Typography Banner for PWA icon -->
+  <rect x="76" y="380" width="360" height="64" rx="20" fill="#231E1B" fill-opacity="0.95" />
+  <text x="256" y="422" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="30" font-weight="900" fill="#EAEEBB" text-anchor="middle" letter-spacing="3">MOD LOGAR</text>
+</svg>

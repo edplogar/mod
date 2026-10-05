@@ -13,8 +13,8 @@ export const DEFAULT_BRANDING: HotelBrandingConfig = {
   logoShape: 'rounded',
   bgColor: '#16A34A',
   tagline: 'Experience the Green of the City',
-  brandTitle: 'LOMBOK GARDEN',
-  brandSubtitle: 'HOTEL • REPORT LOGAR',
+  brandTitle: 'LOMBOK GARDEN HOTEL',
+  brandSubtitle: 'MOD REPORT LOGAR',
   badgeText: 'MOD',
   customIconType: 'default_flower',
 };
@@ -69,13 +69,20 @@ export function getSystemSettings(): SystemSettings {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
+      const branding = {
+        ...DEFAULT_BRANDING,
+        ...(parsed.branding || {})
+      };
+      if (branding.brandTitle === 'LOMBOK GARDEN') {
+        branding.brandTitle = 'LOMBOK GARDEN HOTEL';
+      }
+      if (branding.brandSubtitle === 'HOTEL • REPORT LOGAR' || branding.brandSubtitle === 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty') {
+        branding.brandSubtitle = 'MOD REPORT LOGAR';
+      }
       return { 
         ...DEFAULT_SYSTEM_SETTINGS, 
         ...parsed,
-        branding: {
-          ...DEFAULT_BRANDING,
-          ...(parsed.branding || {})
-        }
+        branding
       };
     }
   } catch (e) {

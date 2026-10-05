@@ -121,13 +121,13 @@ export const LoginPage: React.FC<LoginPageProps> = ({
               </div>
 
               <h1 className="text-2xl font-black text-[#231E1B] tracking-tight uppercase">
-                {branding.brandTitle || 'MOD REPORT LOGAR'}
+                {branding.brandTitle || 'LOMBOK GARDEN HOTEL'}
               </h1>
               <p className="text-xs text-[#70635A] mt-1 font-medium">
-                {branding.brandSubtitle || 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty'}
+                {branding.brandSubtitle || 'MOD REPORT LOGAR'}
               </p>
               <p className="text-[11px] text-[#95A823] font-serif italic mt-0.5 font-bold">
-                Hotel {branding.brandTitle || 'Lombok Garden'} &bull; Mataram
+                Hotel Lombok Garden &bull; Mataram
               </p>
             </div>
 

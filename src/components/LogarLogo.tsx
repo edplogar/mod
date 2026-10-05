@@ -92,8 +92,8 @@ export const LogarLogo: React.FC<LogarLogoProps> = ({
   const textColor = light ? '#FFFFFF' : '#231E1B';
   const bgColor = activeBranding.bgColor || '#95A823';
   const shapeClass = getShapeClass(activeBranding.logoShape);
-  const brandTitle = activeBranding.brandTitle || 'LOMBOK GARDEN';
-  const brandSubtitle = activeBranding.brandSubtitle || 'HOTEL • REPORT LOGAR';
+  const brandTitle = activeBranding.brandTitle || 'LOMBOK GARDEN HOTEL';
+  const brandSubtitle = activeBranding.brandSubtitle || 'MOD REPORT LOGAR';
   const badgeText = activeBranding.badgeText || 'MOD';
   const hasCustomImage = Boolean(activeBranding.logoUrl && !imageError);
 
@@ -217,12 +217,6 @@ export const LogarLogo: React.FC<LogarLogoProps> = ({
             style={{ color: textColor }}
           >
             {brandTitle}
-          </span>
-          <span 
-            className="text-[10px] font-black px-1.5 py-0.5 rounded tracking-wide uppercase shadow-2xs shrink-0"
-            style={{ backgroundColor: bgColor, color: '#FFFFFF' }}
-          >
-            {badgeText}
           </span>
         </div>
         <p className="text-[10px] tracking-widest uppercase font-semibold text-[#C6CC81] truncate max-w-[200px] sm:max-w-[260px]">

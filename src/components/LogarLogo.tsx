@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { HotelBrandingConfig, LogoShape } from '../types';
-import { getHotelBranding } from '../services/systemSettingsService';
+import { getHotelBranding, normalizeBranding } from '../services/systemSettingsService';
 import { Edit2, Sparkles, Building2, Shield, Leaf } from 'lucide-react';
 
 interface LogarLogoProps {
@@ -65,20 +65,20 @@ export const LogarLogo: React.FC<LogarLogoProps> = ({
   showEditButton = false,
 }) => {
   const [activeBranding, setActiveBranding] = useState<HotelBrandingConfig>(() => {
-    return propBranding || getHotelBranding();
+    return normalizeBranding(propBranding || getHotelBranding());
   });
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
     if (propBranding) {
-      setActiveBranding(propBranding);
+      setActiveBranding(normalizeBranding(propBranding));
       setImageError(false);
       return;
     }
 
     const handleSettingsUpdate = (e: any) => {
       if (e.detail?.branding) {
-        setActiveBranding(e.detail.branding);
+        setActiveBranding(normalizeBranding(e.detail.branding));
         setImageError(false);
       }
     };

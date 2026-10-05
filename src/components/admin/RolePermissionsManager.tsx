@@ -122,19 +122,36 @@ export const RolePermissionsManager: React.FC<RolePermissionsManagerProps> = ({
       return;
     }
 
-    const baseRolePerms = permissions.roles[user.role];
-    const existingOverride = permissions.userOverrides?.[userId] || {};
+    const baseRolePerms = permissions.roles?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS['Staff'];
+    const existingOverride = permissions.userOverrides?.[userId] || 
+      (user.username ? permissions.userOverrides?.[user.username] : {}) || 
+      (user.email ? permissions.userOverrides?.[user.email] : {}) || {};
+    
     const currentValue = existingOverride[permKey] !== undefined 
       ? existingOverride[permKey] 
-      : baseRolePerms[permKey];
+      : (baseRolePerms as any)[permKey];
+
+    const nextValue = !currentValue;
+
+    const updatedOverrideForUser = {
+      ...existingOverride,
+      [permKey]: nextValue,
+    };
+
+    // If enabling canEditReportStatus, ensure canAccessReports is also enabled so user can access the table
+    if (permKey === 'canEditReportStatus' && nextValue === true) {
+      updatedOverrideForUser.canAccessReports = true;
+    }
 
     const updatedOverrides = {
       ...(permissions.userOverrides || {}),
-      [userId]: {
-        ...existingOverride,
-        [permKey]: !currentValue,
-      },
+      [userId]: updatedOverrideForUser,
     };
+
+    // Also mirror to username if different for maximum lookup compatibility
+    if (user.username && user.username !== userId) {
+      updatedOverrides[user.username] = updatedOverrideForUser;
+    }
 
     const updatedPermissions: SystemPermissionsState = {
       ...permissions,

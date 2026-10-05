@@ -79,6 +79,30 @@ try {
       if (!Array.isArray(db.auditLogs)) {
         db.auditLogs = [];
       }
+      // Ensure branding is normalized
+      if (!db.settings) {
+        db.settings = JSON.parse(JSON.stringify(DEFAULT_SYSTEM_SETTINGS));
+      }
+      if (!db.settings.branding) {
+        db.settings.branding = {
+          logoUrl: '/logo-emblem.svg',
+          logoShape: 'rounded',
+          bgColor: '#16A34A',
+          tagline: 'Experience the Green of the City',
+          brandTitle: 'LOMBOK GARDEN HOTEL',
+          brandSubtitle: 'MOD REPORT LOGAR',
+          badgeText: 'MOD',
+          customIconType: 'default_flower',
+        };
+      } else {
+        if (!db.settings.branding.brandTitle || db.settings.branding.brandTitle === 'LOMBOK GARDEN' || db.settings.branding.brandTitle === 'MOD REPORT LOGAR') {
+          db.settings.branding.brandTitle = 'LOMBOK GARDEN HOTEL';
+        }
+        if (!db.settings.branding.brandSubtitle || db.settings.branding.brandSubtitle === 'HOTEL • REPORT LOGAR' || db.settings.branding.brandSubtitle === 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty') {
+          db.settings.branding.brandSubtitle = 'MOD REPORT LOGAR';
+        }
+      }
+      saveDatabaseToDisk();
       console.log(`[DB] Database loaded from disk. Users: ${db.users.length}, Reports: ${db.reports.length}, Version: ${db.version}`);
     } else {
       console.log('[DB] Corrupted database file found. Re-initializing default database...');

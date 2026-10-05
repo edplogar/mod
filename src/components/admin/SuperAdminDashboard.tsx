@@ -52,6 +52,7 @@ import { ChangeLogoModal } from '../ChangeLogoModal.tsx';
 import { LogarLogo } from '../LogarLogo.tsx';
 import { 
   getStoredPermissions, 
+  saveStoredPermissions,
   subscribeToFirestorePermissions, 
   syncPermissionsToFirestore 
 } from '../../services/permissionService.ts';
@@ -954,6 +955,10 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                 permissions={permissions}
                 onUpdatePermissions={(newPerms) => {
                   setPermissions(newPerms);
+                  saveStoredPermissions(newPerms);
+                  syncPermissionsToFirestore(newPerms).catch((err) => {
+                    console.warn('Auto-sync permissions note:', err);
+                  });
                   addAuditLog('PERMISSION_UPDATED', 'Super Admin memperbarui konfigurasi peran & hak akses menu (RBAC)', 'SECURITY');
                 }}
                 users={users}

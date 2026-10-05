@@ -1,4 +1,5 @@
 import { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from '../types';
+import { normalizeSystemSettings } from './systemSettingsService';
 
 const SYNC_VERSION_KEY = 'mod_report_client_sync_version_v1';
 const ALL_USERS_STORAGE_KEY = 'mod_report_all_users_v3';
@@ -53,8 +54,9 @@ export function applyDatabaseSync(data: FullSyncPayload): void {
     }
 
     if (data.settings) {
-      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(data.settings));
-      window.dispatchEvent(new CustomEvent('logar_settings_updated', { detail: data.settings }));
+      const normalizedSettings = normalizeSystemSettings(data.settings);
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalizedSettings));
+      window.dispatchEvent(new CustomEvent('logar_settings_updated', { detail: normalizedSettings }));
     }
 
     if (Array.isArray(data.auditLogs)) {

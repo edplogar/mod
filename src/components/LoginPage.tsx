@@ -13,7 +13,7 @@ import {
 import { UserProfile, HotelBrandingConfig } from '../types';
 import { authenticateUser } from '../services/authService';
 import { fetchFullDatabaseSync } from '../services/liveSyncService';
-import { getHotelBranding } from '../services/systemSettingsService';
+import { getHotelBranding, normalizeBranding } from '../services/systemSettingsService';
 import { LogarLogo, HotelFlowerIcon, getShapeClass } from './LogarLogo';
 import { PWAInstallButton } from './pwa/PWAInstallButton';
 import { OfflineIndicator } from './pwa/OfflineIndicator';
@@ -32,12 +32,12 @@ export const LoginPage: React.FC<LoginPageProps> = ({
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [branding, setBranding] = useState<HotelBrandingConfig>(() => getHotelBranding());
+  const [branding, setBranding] = useState<HotelBrandingConfig>(() => normalizeBranding(getHotelBranding()));
 
   useEffect(() => {
     const handleSettingsUpdate = (e: any) => {
       if (e.detail?.branding) {
-        setBranding(e.detail.branding);
+        setBranding(normalizeBranding(e.detail.branding));
       }
     };
     window.addEventListener('logar_settings_updated', handleSettingsUpdate);

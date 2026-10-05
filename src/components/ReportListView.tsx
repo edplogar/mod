@@ -578,21 +578,41 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
                       {/* Actions */}
                       <td className="py-3 px-3 text-center">
-                        {perms.canDeleteReport ? (
-                          <button
-                            onClick={() => {
-                              if (window.confirm('Hapus baris laporan inspeksi ini?')) {
-                                onDeleteReport(report.id);
-                              }
-                            }}
-                            className="p-1 rounded text-[#877465] hover:text-[#C25941] hover:bg-[#FBEBE7] transition cursor-pointer"
-                            title="Hapus baris laporan"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        ) : (
-                          <span className="text-gray-300 text-xs">-</span>
-                        )}
+                        <div className="flex items-center justify-center gap-1.5">
+                          {perms.canEditReportStatus && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const statuses: ReportStatus[] = ['Aman', 'Perlu Follow Up', 'Dalam Proses', 'Selesai'];
+                                const currentIndex = statuses.indexOf(report.status);
+                                const nextStatus = statuses[(currentIndex + 1) % statuses.length];
+                                onUpdateStatus(report.id, nextStatus);
+                              }}
+                              className="p-1.5 rounded-lg text-[#5B6713] bg-[#EAEEBB]/60 hover:bg-[#EAEEBB] border border-[#C6CC81] transition cursor-pointer flex items-center gap-1"
+                              title={`Ubah status cepat ke tahap berikutnya (Saat ini: ${report.status})`}
+                            >
+                              <RotateCcw className="w-3.5 h-3.5 text-[#7B8C1B]" />
+                            </button>
+                          )}
+
+                          {perms.canDeleteReport && (
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Hapus baris laporan inspeksi ini?')) {
+                                  onDeleteReport(report.id);
+                                }
+                              }}
+                              className="p-1.5 rounded-lg text-[#877465] hover:text-[#C25941] hover:bg-[#FBEBE7] transition cursor-pointer"
+                              title="Hapus baris laporan"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          )}
+
+                          {!perms.canEditReportStatus && !perms.canDeleteReport && (
+                            <span className="text-gray-300 text-xs">-</span>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   );

@@ -19,6 +19,36 @@ export const DEFAULT_BRANDING: HotelBrandingConfig = {
   customIconType: 'default_flower',
 };
 
+export function normalizeBranding(rawBranding?: any): HotelBrandingConfig {
+  const merged: HotelBrandingConfig = {
+    ...DEFAULT_BRANDING,
+    ...(rawBranding || {}),
+  };
+
+  if (!merged.brandTitle || merged.brandTitle === 'LOMBOK GARDEN' || merged.brandTitle === 'MOD REPORT LOGAR') {
+    merged.brandTitle = 'LOMBOK GARDEN HOTEL';
+  }
+
+  if (
+    !merged.brandSubtitle ||
+    merged.brandSubtitle === 'HOTEL • REPORT LOGAR' ||
+    merged.brandSubtitle === 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty'
+  ) {
+    merged.brandSubtitle = 'MOD REPORT LOGAR';
+  }
+
+  return merged;
+}
+
+export function normalizeSystemSettings(rawSettings?: any): SystemSettings {
+  if (!rawSettings) return DEFAULT_SYSTEM_SETTINGS;
+  return {
+    ...DEFAULT_SYSTEM_SETTINGS,
+    ...rawSettings,
+    branding: normalizeBranding(rawSettings.branding),
+  };
+}
+
 export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
   hotelName: 'Hotel Lombok Garden',
   hotelAddress: 'Jl. Bung Karno No. 7, Mataram, Nusa Tenggara Barat 83127',
@@ -69,21 +99,8 @@ export function getSystemSettings(): SystemSettings {
     const raw = localStorage.getItem(SETTINGS_STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      const branding = {
-        ...DEFAULT_BRANDING,
-        ...(parsed.branding || {})
-      };
-      if (branding.brandTitle === 'LOMBOK GARDEN') {
-        branding.brandTitle = 'LOMBOK GARDEN HOTEL';
-      }
-      if (branding.brandSubtitle === 'HOTEL • REPORT LOGAR' || branding.brandSubtitle === 'Sistem Pelaporan & Monitoring Lapangan Manager on Duty') {
-        branding.brandSubtitle = 'MOD REPORT LOGAR';
-      }
-      return { 
-        ...DEFAULT_SYSTEM_SETTINGS, 
-        ...parsed,
-        branding
-      };
+      const normalized = normalizeSystemSettings(parsed);
+      return normalized;
     }
   } catch (e) {
     console.error('Failed loading system settings', e);
@@ -101,12 +118,12 @@ export function updateHotelBranding(brandingUpdates: Partial<HotelBrandingConfig
   const currentSettings = getSystemSettings();
   const currentBranding = currentSettings.branding || DEFAULT_BRANDING;
   
-  const updatedBranding: HotelBrandingConfig = {
+  const updatedBranding: HotelBrandingConfig = normalizeBranding({
     ...currentBranding,
     ...brandingUpdates,
     updatedAt: new Date().toISOString(),
     updatedBy: actor,
-  };
+  });
 
   return updateSystemSettings({
     branding: updatedBranding,
@@ -116,7 +133,8 @@ export function updateHotelBranding(brandingUpdates: Partial<HotelBrandingConfig
 
 export function saveSystemSettings(settings: SystemSettings): void {
   try {
-    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
+    const normalized = normalizeSystemSettings(settings);
+    localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(normalized));
   } catch (e) {
     console.error('Failed saving system settings', e);
   }
@@ -166,15 +184,25 @@ export function updateSystemSettings(updates: Partial<SystemSettings>, actor: st
 
 export function setSettingsFromCloud(cloudSettings: SystemSettings): void {
   if (!cloudSettings) return;
-  saveSystemSettings(cloudSettings);
+  const normalized = normalizeSystemSettings(cloudSettings);
+  saveSystemSettings(normalized);
   saveSyncConfig({
-    driveFolderId: cloudSettings.driveFolderId,
-    driveFolderName: cloudSettings.driveFolderName,
-    driveWebhookUrl: cloudSettings.driveWebhookUrl,
-    isAutoSyncEnabled: cloudSettings.autoSyncEnabled,
+    driveFolderId: normalized.driveFolderId,
+    driveFolderName: normalized.driveFolderName,
+    driveWebhookUrl: normalized.driveWebhookUrl,
+    isAutoSyncEnabled: normalized.autoSyncEnabled,
   });
+
+  // If cloud settings had old branding values, persist normalized settings back to Firestore
+  if (
+    cloudSettings.branding?.brandTitle !== normalized.branding?.brandTitle ||
+    cloudSettings.branding?.brandSubtitle !== normalized.branding?.brandSubtitle
+  ) {
+    saveSettingsToFirestore(normalized).catch(() => {});
+  }
+
   try {
-    window.dispatchEvent(new CustomEvent('logar_settings_updated', { detail: cloudSettings }));
+    window.dispatchEvent(new CustomEvent('logar_settings_updated', { detail: normalized }));
   } catch {
     // ignore
   }

@@ -17,7 +17,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'Super Admin': {
     role: 'Super Admin',
     displayName: 'Super Administrator',
-    description: 'Akses penuh tanpa batas ke semua menu, ekspor, database cloud, dan manajemen sistem',
+    description: 'Akses penuh tanpa batas ke semua menu, input laporan baru, ekspor, database cloud, dan manajemen sistem',
     canAccessDashboard: true,
     canAccessReports: true,
     canCreateReport: true,
@@ -33,7 +33,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
     description: 'Akses eksekutif manajemen: analisis visual, seluruh riwayat temuan, dan ekspor laporan PDF',
     canAccessDashboard: true,
     canAccessReports: true,
-    canCreateReport: true,
+    canCreateReport: false,
     canExportPdf: true,
     canSyncCloud: true,
     canEditReportStatus: true,
@@ -43,10 +43,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'Duty Manager': {
     role: 'Duty Manager',
     displayName: 'Duty Manager (DM)',
-    description: 'Pimpinan operasional harian: pemantauan area, input temuan patroli, dan disposisi departemen',
+    description: 'Pimpinan operasional harian: pemantauan area, tindak lanjut temuan, dan disposisi departemen',
     canAccessDashboard: true,
     canAccessReports: true,
-    canCreateReport: true,
+    canCreateReport: false,
     canExportPdf: true,
     canSyncCloud: false,
     canEditReportStatus: true,
@@ -56,10 +56,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'MOD Officer': {
     role: 'MOD Officer',
     displayName: 'Petugas MOD (Manager on Duty)',
-    description: 'Petugas piket inspeksi fisik hotel: dasbor operasional dan form input temuan patroli',
+    description: 'Petugas piket inspeksi fisik hotel: dasbor visual operasional dan monitoring temuan patroli',
     canAccessDashboard: true,
     canAccessReports: false,
-    canCreateReport: true,
+    canCreateReport: false,
     canExportPdf: false,
     canSyncCloud: false,
     canEditReportStatus: true,
@@ -72,7 +72,7 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
     description: 'Monitoring kondisi departemen terkait, tindak lanjut temuan lapangan, dan rekapitulasi data',
     canAccessDashboard: true,
     canAccessReports: true,
-    canCreateReport: true,
+    canCreateReport: false,
     canExportPdf: true,
     canSyncCloud: false,
     canEditReportStatus: true,
@@ -82,10 +82,10 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'Staff': {
     role: 'Staff',
     displayName: 'Staff Pelaksana Lapangan',
-    description: 'Akses terbatas untuk pelaporan temuan baru dan pemantauan ringkasan dasbor operasional',
+    description: 'Akses terbatas untuk pemantauan ringkasan dasbor operasional',
     canAccessDashboard: true,
     canAccessReports: false,
-    canCreateReport: true,
+    canCreateReport: false,
     canExportPdf: false,
     canSyncCloud: false,
     canEditReportStatus: false,
@@ -274,23 +274,61 @@ export function getUserPermissions(
   if (user.role === 'Super Admin') {
     return {
       ...DEFAULT_ROLE_PERMISSIONS['Super Admin'],
-      ...(state.roles['Super Admin'] || {}),
+      ...(state.roles?.['Super Admin'] || {}),
       canAccessSuperAdmin: true,
       canAccessDashboard: true,
     };
   }
 
-  const roleBase = state.roles[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS['Staff'];
+  const roleBase = state.roles?.[user.role] || DEFAULT_ROLE_PERMISSIONS[user.role] || DEFAULT_ROLE_PERMISSIONS['Staff'];
 
-  // Check user-specific override if present
-  if (state.userOverrides && state.userOverrides[user.id]) {
-    return {
+  // Check user-specific override with resilient multi-identifier matching (id, username, email, name)
+  let userOverride: Partial<RolePermissionConfig> | undefined = undefined;
+  if (state.userOverrides) {
+    if (user.id && state.userOverrides[user.id]) {
+      userOverride = state.userOverrides[user.id];
+    } else if (user.username && state.userOverrides[user.username]) {
+      userOverride = state.userOverrides[user.username];
+    } else if (user.email && state.userOverrides[user.email]) {
+      userOverride = state.userOverrides[user.email];
+    } else {
+      // Find case-insensitive or partial id match
+      const overrideKeys = Object.keys(state.userOverrides);
+      for (const k of overrideKeys) {
+        const kLower = k.toLowerCase().trim();
+        const idLower = (user.id || '').toLowerCase().trim();
+        const usernameLower = (user.username || '').toLowerCase().trim();
+        const emailLower = (user.email || '').toLowerCase().trim();
+        const nameLower = (user.name || '').toLowerCase().trim();
+
+        if (
+          (idLower && (kLower === idLower || kLower.includes(idLower) || idLower.includes(kLower))) ||
+          (usernameLower && (kLower === usernameLower || kLower.includes(usernameLower))) ||
+          (emailLower && kLower === emailLower) ||
+          (nameLower && kLower === nameLower)
+        ) {
+          userOverride = state.userOverrides[k];
+          break;
+        }
+      }
+    }
+  }
+
+  if (userOverride) {
+    const combined: RolePermissionConfig = {
       ...roleBase,
-      ...state.userOverrides[user.id],
+      ...userOverride,
       role: user.role,
       displayName: roleBase.displayName,
       description: roleBase.description,
     };
+
+    // If granted personal access to edit report status, automatically guarantee access to reports tab
+    if (combined.canEditReportStatus) {
+      combined.canAccessReports = true;
+    }
+
+    return combined;
   }
 
   return roleBase;

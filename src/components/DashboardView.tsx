@@ -97,7 +97,7 @@ interface DashboardViewProps {
   currentUser: UserProfile;
   userPermissions?: RolePermissionConfig;
   onNavigateToReports: (filterStatus?: string) => void;
-  onOpenNewReport: () => void;
+  onOpenNewReport?: () => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -105,7 +105,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   userPermissions,
   onNavigateToReports,
-  onOpenNewReport,
 }) => {
   const perms = userPermissions || getUserPermissions(currentUser);
 
@@ -388,15 +387,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               ))}
             </select>
           </div>
-
-          {perms.canCreateReport && (
-            <button
-              onClick={onOpenNewReport}
-              className="px-4 py-2 bg-[#95A823] hover:bg-[#83941F] text-white font-bold text-xs rounded-2xl shadow-md shadow-[#95A823]/25 transition flex items-center gap-1.5 cursor-pointer"
-            >
-              <span>+ Input Baru</span>
-            </button>
-          )}
         </div>
       </div>
 

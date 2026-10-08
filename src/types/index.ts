@@ -46,6 +46,9 @@ export interface ModReportItem {
   notes?: string;
   synced: boolean;
   syncedAt?: string;
+  resolvedAt?: string;
+  resolvedBy?: string;
+  resolutionDurationHours?: number;
 }
 
 export type UserRole = 'Super Admin' | 'General Manager' | 'Duty Manager' | 'MOD Officer' | 'Department Head' | 'Staff';

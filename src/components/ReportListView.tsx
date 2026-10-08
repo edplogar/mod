@@ -36,6 +36,7 @@ import { getDriveFolderUrl } from '../services/driveSyncService';
 import { getSystemSettings } from '../services/systemSettingsService';
 import { getUserPermissions } from '../services/permissionService';
 import { isDateOnOrAfterOctober2026 } from '../data/initialData';
+import { getReportResolutionItem, isFollowUpFinding } from '../services/kpiResolutionService';
 
 export type SearchScope = 'all' | 'location' | 'officer' | 'description';
 
@@ -544,20 +545,53 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
 
                       {/* Status + Toggle Dropdown */}
                       <td className="py-3 px-4 text-center">
-                        {perms.canEditReportStatus ? (
-                          <select
-                            value={report.status}
-                            onChange={(e) => onUpdateStatus(report.id, e.target.value as ReportStatus)}
-                            className="text-xs font-semibold px-2 py-1 rounded-lg border border-[#D9DF98] bg-[#FAFBF5] focus:bg-white text-[#231E1B] focus:outline-none cursor-pointer"
-                          >
-                            <option value="Aman">Aman</option>
-                            <option value="Perlu Follow Up">Perlu Follow Up</option>
-                            <option value="Dalam Proses">Dalam Proses</option>
-                            <option value="Selesai">Selesai</option>
-                          </select>
-                        ) : (
-                          getStatusBadge(report.status)
-                        )}
+                        <div className="flex flex-col items-center gap-1">
+                          {perms.canEditReportStatus ? (
+                            <select
+                              value={report.status}
+                              onChange={(e) => onUpdateStatus(report.id, e.target.value as ReportStatus)}
+                              className="text-xs font-semibold px-2 py-1 rounded-lg border border-[#D9DF98] bg-[#FAFBF5] focus:bg-white text-[#231E1B] focus:outline-none cursor-pointer"
+                            >
+                              <option value="Aman">Aman</option>
+                              <option value="Perlu Follow Up">Perlu Follow Up</option>
+                              <option value="Dalam Proses">Dalam Proses</option>
+                              <option value="Selesai">Selesai</option>
+                            </select>
+                          ) : (
+                            getStatusBadge(report.status)
+                          )}
+
+                          {/* SLA Resolution / Aging Duration for Follow-Up Findings */}
+                          {isFollowUpFinding(report) && (() => {
+                            const resItem = getReportResolutionItem(report);
+                            if (report.status === 'Selesai') {
+                              return (
+                                <span 
+                                  className="text-[9px] font-bold text-[#5B6713] bg-[#EAEEBB] px-1.5 py-0.5 rounded border border-[#C6CC81] flex items-center gap-0.5"
+                                  title={`Tuntas dalam ${resItem.durationText}`}
+                                >
+                                  <Clock className="w-2.5 h-2.5 text-[#7B8C1B]" />
+                                  <span>Tuntas {resItem.durationText}</span>
+                                </span>
+                              );
+                            } else {
+                              const isOverdue = resItem.durationHours > 12;
+                              return (
+                                <span 
+                                  className={`text-[9px] font-bold px-1.5 py-0.5 rounded border flex items-center gap-0.5 ${
+                                    isOverdue 
+                                      ? 'text-[#C25941] bg-[#FBEBE7] border-[#F2D7D0]' 
+                                      : 'text-[#8C5311] bg-[#FFF8EE] border-[#FFDEB5]'
+                                  }`}
+                                  title={`Durasi aktif: ${resItem.durationText}`}
+                                >
+                                  <Clock className="w-2.5 h-2.5" />
+                                  <span>{resItem.durationText}</span>
+                                </span>
+                              );
+                            }
+                          })()}
+                        </div>
                       </td>
 
                       {/* Pictures & Google Drive Link */}

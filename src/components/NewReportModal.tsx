@@ -248,6 +248,8 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
       shift,
       synced: true,
       syncedAt: new Date().toISOString(),
+      resolvedAt: status === 'Selesai' ? new Date().toISOString() : undefined,
+      resolvedBy: status === 'Selesai' ? officerName : undefined,
     };
 
     onSubmit(newReport);

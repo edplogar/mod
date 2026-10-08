@@ -38,6 +38,7 @@ import {
   fetchPermissionsFromFirestore, 
   getUserPermissions 
 } from './services/permissionService';
+import { parseReportDateTime } from './services/kpiResolutionService';
 import { LoginPage } from './components/LoginPage';
 import { Navbar } from './components/Navbar';
 import { DashboardView } from './components/DashboardView';
@@ -270,9 +271,38 @@ export default function App() {
   // Update report status
   const handleUpdateStatus = (reportId: string, newStatus: ReportStatus) => {
     let targetReport: ModReportItem | null = null;
+    const nowIso = new Date().toISOString();
+    const nowMs = Date.now();
+
     const updated = reports.map(r => {
       if (r.id === reportId) {
-        targetReport = { ...r, status: newStatus, synced: false };
+        let resolvedAt = r.resolvedAt;
+        let resolvedBy = r.resolvedBy;
+        let resolutionDurationHours = r.resolutionDurationHours;
+
+        if (newStatus === 'Selesai') {
+          if (!resolvedAt) {
+            resolvedAt = nowIso;
+            resolvedBy = currentUser?.name || 'Petugas MOD';
+            const createdMs = parseReportDateTime(r).getTime();
+            const diffHours = Math.max(0.1, (nowMs - createdMs) / (1000 * 3600));
+            resolutionDurationHours = Math.round(diffHours * 10) / 10;
+          }
+        } else {
+          // If moved back to Perlu Follow Up or Dalam Proses, clear completion timestamp
+          resolvedAt = undefined;
+          resolvedBy = undefined;
+          resolutionDurationHours = undefined;
+        }
+
+        targetReport = { 
+          ...r, 
+          status: newStatus, 
+          resolvedAt,
+          resolvedBy,
+          resolutionDurationHours,
+          synced: false 
+        };
         return targetReport;
       }
       return r;
@@ -521,6 +551,7 @@ export default function App() {
               currentUser={currentUser}
               userPermissions={currentPermissions}
               onNavigateToReports={handleNavigateToReports}
+              onUpdateStatus={handleUpdateStatus}
               onOpenNewReport={() => {
                 if (!currentPermissions.canCreateReport) {
                   showToast('Akses dibatasi: Role Anda tidak memiliki izin input laporan.');

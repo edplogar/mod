@@ -37,8 +37,12 @@ import {
   Users,
   ShieldAlert,
   ArrowRight,
-  Filter
+  Filter,
+  Zap
 } from 'lucide-react';
+import { ResolutionKpiSection } from './ResolutionKpiSection';
+import { calculateResolutionKpi } from '../services/kpiResolutionService';
+import type { ReportStatus } from '../types/index.ts';
 
 ChartJS.register(
   CategoryScale,
@@ -98,6 +102,7 @@ interface DashboardViewProps {
   userPermissions?: RolePermissionConfig;
   onNavigateToReports: (filterStatus?: string) => void;
   onOpenNewReport?: () => void;
+  onUpdateStatus?: (reportId: string, newStatus: ReportStatus) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -105,6 +110,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   currentUser,
   userPermissions,
   onNavigateToReports,
+  onUpdateStatus,
 }) => {
   const perms = userPermissions || getUserPermissions(currentUser);
 
@@ -178,6 +184,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       safePercentage,
       storage,
     };
+  }, [activeReports]);
+
+  // Resolution Turnaround KPI
+  const resolutionKpi = useMemo(() => {
+    return calculateResolutionKpi(activeReports);
   }, [activeReports]);
 
   // Inspection Volume Over Months (Starting from October 2026)
@@ -390,8 +401,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </div>
       </div>
 
-      {/* 4 Big KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 5 Big KPI Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
         {/* KPI 1: Total Inspeksi */}
         <div 
           onClick={() => {
@@ -418,7 +429,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             <span className="text-xs text-[#70635A]">titik inspeksi</span>
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
-            <span>Rata-rata 4-8 titik per shift</span>
+            <span>Rata-rata 4-8 titik/shift</span>
             {perms.canAccessReports ? (
               <span className="text-[#95A823] font-bold flex items-center gap-0.5">
                 Lihat data <ArrowRight className="w-3 h-3" />
@@ -453,7 +464,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-[#95A823]">{stats.safe}</span>
             <span className="text-xs font-black text-[#5B6713] bg-[#EAEEBB] px-2.5 py-0.5 rounded-full border border-[#D9DF98]">
-              {stats.safePercentage}% Aman
+              {stats.safePercentage}%
             </span>
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
@@ -492,11 +503,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="mt-3 flex items-baseline gap-2">
             <span className="text-3xl font-black text-[#C25941]">{stats.needFollowUp}</span>
             <span className="text-xs font-semibold text-[#877465]">
-              {stats.inProgress > 0 && `(${stats.inProgress} in progress)`}
+              {stats.inProgress > 0 && `(${stats.inProgress} proses)`}
             </span>
           </div>
           <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
-            <span>HK &amp; Engineering Terbanyak</span>
+            <span>HK &amp; Engineering</span>
             {perms.canAccessReports ? (
               <span className="text-[#C25941] font-bold flex items-center gap-0.5">
                 Tindak lanjut <ArrowRight className="w-3 h-3" />
@@ -507,29 +518,72 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           </div>
         </div>
 
-        {/* KPI 4: Google Drive & Kompresi Storage */}
+        {/* KPI 4: KPI Waktu Penyelesaian Follow-Up (SLA) */}
+        <div 
+          onClick={() => {
+            if (perms.canAccessReports) {
+              onNavigateToReports('Selesai');
+            }
+          }}
+          className={`bg-white rounded-3xl p-5 border border-[#D9DF98] shadow-xs transition group ${
+            perms.canAccessReports 
+              ? 'hover:border-[#95A823] hover:shadow-md cursor-pointer' 
+              : ''
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#70635A] uppercase tracking-wider">
+              Waktu Selesai (SLA)
+            </span>
+            <div className="w-10 h-10 rounded-2xl bg-[#EAEEBB] text-[#5B6713] flex items-center justify-center font-bold group-hover:bg-[#95A823] group-hover:text-white transition">
+              <Clock className="w-5 h-5 text-[#7B8C1B]" />
+            </div>
+          </div>
+          <div className="mt-3 flex items-baseline gap-2">
+            <span className="text-3xl font-black text-[#231E1B]">{resolutionKpi.avgResolutionHours}</span>
+            <span className="text-xs font-bold text-[#70635A]">Jam Rata-rata</span>
+          </div>
+          <div className="mt-3 pt-3 border-t border-[#F0F2E2] flex items-center justify-between text-xs text-[#70635A]">
+            <span className="font-semibold text-[#5B6713] bg-[#EAEEBB] px-2 py-0.5 rounded-full text-[10px]">
+              {resolutionKpi.resolutionRate}% Tuntas
+            </span>
+            <span className="text-[#95A823] font-bold text-[11px]">
+              Target &le; 6 Jam
+            </span>
+          </div>
+        </div>
+
+        {/* KPI 5: Google Drive & Kompresi Storage */}
         <div className="bg-gradient-to-br from-[#231E1B] to-[#362F2B] text-white rounded-3xl p-5 shadow-md border border-[#4A403A]">
           <div className="flex items-center justify-between">
             <span className="text-xs font-bold text-[#EAEEBB] uppercase tracking-wider flex items-center gap-1.5">
               <HardDrive className="w-4 h-4 text-[#95A823]" />
-              Efisiensi Google Drive
+              Drive Kompresi
             </span>
             <span className="text-[10px] font-black bg-[#95A823]/30 text-[#EAEEBB] px-2 py-0.5 rounded-full border border-[#95A823]/50">
               Hemat {stats.storage.percentageSaved}%
             </span>
           </div>
           <div className="mt-3 flex items-baseline gap-2">
-            <span className="text-2xl font-black text-white">
+            <span className="text-2xl font-black text-white truncate">
               {formatBytes(stats.storage.savedBytes)}
             </span>
-            <span className="text-xs text-[#D9DF98]">dihemat</span>
+            <span className="text-xs text-[#D9DF98]">hemat</span>
           </div>
           <div className="mt-3 pt-3 border-t border-[#4A403A] flex items-center justify-between text-xs text-slate-300">
-            <span>{stats.storage.totalPictures} bukti foto terkompres</span>
-            <span className="text-[#95A823] font-bold">Drive Sinkron</span>
+            <span className="truncate">{stats.storage.totalPictures} bukti foto</span>
+            <span className="text-[#95A823] font-bold shrink-0">Sinkron</span>
           </div>
         </div>
       </div>
+
+      {/* Dedicated Follow-Up Resolution KPI & SLA Section */}
+      <ResolutionKpiSection
+        reports={activeReports}
+        userPermissions={perms}
+        onUpdateStatus={onUpdateStatus}
+        onNavigateToReports={onNavigateToReports}
+      />
 
       {/* Main Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">

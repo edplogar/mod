@@ -28,7 +28,8 @@ import {
   saveReportToFirestore, 
   deleteReportFromFirestore, 
   initFirebaseAuth, 
-  seedUsersToFirestore 
+  seedUsersToFirestore,
+  isFirestoreQuotaExceeded
 } from './services/firebase';
 import { ModReportItem, ReportStatus, UserProfile, CloudSyncState, SystemPermissionsState, RolePermissionConfig } from './types';
 import { 
@@ -76,6 +77,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState<'dashboard' | 'reports'>('dashboard');
   const [reportFilterStatus, setReportFilterStatus] = useState<string>('all');
   const [permissions, setPermissions] = useState<SystemPermissionsState>(getStoredPermissions());
+  const [firestoreQuotaExceeded, setFirestoreQuotaExceededState] = useState(() => isFirestoreQuotaExceeded());
 
   // Modals
   const [isNewReportOpen, setIsNewReportOpen] = useState(false);
@@ -107,12 +109,17 @@ export default function App() {
     setReports(loaded);
     setSyncState(getSyncState(loaded));
 
-    // Initialize Firebase Auth & seed initial users to Firestore
-    initFirebaseAuth().then(() => {
-      seedUsersToFirestore(getAllUsers());
-    }).catch(err => {
-      console.warn('Firebase init note:', err);
-    });
+    // Initialize Firebase Auth & seed initial users to Firestore once
+    const isUsersSeeded = localStorage.getItem('mod_report_users_seeded_cloud_v1');
+    if (!isUsersSeeded && !isFirestoreQuotaExceeded()) {
+      initFirebaseAuth().then(() => {
+        seedUsersToFirestore(getAllUsers()).then(() => {
+          localStorage.setItem('mod_report_users_seeded_cloud_v1', 'true');
+        }).catch(() => {});
+      }).catch(err => {
+        console.warn('Firebase init note:', err);
+      });
+    }
 
     // Real-time synchronization for role permissions matrix across all devices & IPs
     fetchPermissionsFromFirestore().then((cloudPerms) => {
@@ -166,12 +173,18 @@ export default function App() {
     };
     window.addEventListener('logar_permissions_updated', handlePermsUpdated);
 
+    const handleQuotaExceeded = () => {
+      setFirestoreQuotaExceededState(true);
+    };
+    window.addEventListener('logar_firestore_quota_exceeded', handleQuotaExceeded);
+
     return () => {
       unsubReports();
       unsubUsers();
       unsubSettings();
       unsubPerms();
       window.removeEventListener('logar_permissions_updated', handlePermsUpdated);
+      window.removeEventListener('logar_firestore_quota_exceeded', handleQuotaExceeded);
     };
   }, []);
 
@@ -478,6 +491,27 @@ export default function App() {
             </span>
           </div>
         </div>
+
+        {/* Firestore Free Tier Quota Notice Banner */}
+        {firestoreQuotaExceeded && (
+          <div className="bg-[#2E2824] border-b border-[#F2D7D0]/30 px-4 py-2 text-xs text-[#FAFBF5] flex flex-col sm:flex-row items-center justify-between gap-2 shadow-sm">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse shrink-0"></span>
+              <p className="text-[11px] leading-relaxed">
+                <strong>Batas Kuota Gratis Firebase Firestore Tercapai Hari Ini</strong> (Spark Free Tier limit: 20.000 unit tulis/hari). Seluruh data tetap aman tersimpan di database lokal &amp; server hotel. Kuota akan direset otomatis besok oleh Google.
+              </p>
+            </div>
+            <a
+              href="https://console.firebase.google.com/project/liquid-splicer-94mm2/firestore/databases/ai-studio-modreportlogar-a8954153-8d4f-4d57-91ff-5afb4e0a8bff/data?openUpgradeDialog=true"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="shrink-0 px-2.5 py-1 bg-[#95A823] hover:bg-[#83941F] text-white rounded-lg text-[10px] font-bold transition flex items-center gap-1 shadow-xs"
+            >
+              <span>Upgrade / Cek Kuota</span>
+              <ArrowUpRight className="w-3 h-3" />
+            </a>
+          </div>
+        )}
 
         {/* Main Content Area */}
         <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">

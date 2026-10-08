@@ -193,14 +193,6 @@ export function setSettingsFromCloud(cloudSettings: SystemSettings): void {
     isAutoSyncEnabled: normalized.autoSyncEnabled,
   });
 
-  // If cloud settings had old branding values, persist normalized settings back to Firestore
-  if (
-    cloudSettings.branding?.brandTitle !== normalized.branding?.brandTitle ||
-    cloudSettings.branding?.brandSubtitle !== normalized.branding?.brandSubtitle
-  ) {
-    saveSettingsToFirestore(normalized).catch(() => {});
-  }
-
   try {
     window.dispatchEvent(new CustomEvent('logar_settings_updated', { detail: normalized }));
   } catch {

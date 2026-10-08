@@ -58,7 +58,46 @@ export interface FirestoreErrorInfo {
   };
 }
 
+let firestoreQuotaExceededState = false;
+
+export function isQuotaExceededError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  return (
+    msg.includes('resource-exhausted') ||
+    msg.includes('quota metric') ||
+    msg.includes('Quota exceeded') ||
+    msg.includes('Quota limit exceeded') ||
+    msg.includes('Free daily write units')
+  );
+}
+
+export function isFirestoreQuotaExceeded(): boolean {
+  return firestoreQuotaExceededState;
+}
+
+export function setFirestoreQuotaExceeded(exceeded: boolean): void {
+  if (firestoreQuotaExceededState === exceeded) return;
+  firestoreQuotaExceededState = exceeded;
+  if (exceeded) {
+    console.warn(
+      '[Firestore Spark Quota] Free daily write limit reached (20,000 writes/day). Seamlessly maintaining data in local & backend server storage. Quota will automatically reset tomorrow.'
+    );
+    try {
+      window.dispatchEvent(new CustomEvent('logar_firestore_quota_exceeded', { detail: true }));
+    } catch {
+      // ignore
+    }
+  }
+}
+
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  if (isQuotaExceededError(error)) {
+    setFirestoreQuotaExceeded(true);
+    console.warn(`[Firestore Quota] Operation ${operationType} on path "${path}" deferred due to daily quota.`);
+    return;
+  }
+
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
     authInfo: {
@@ -168,6 +207,7 @@ export function subscribeToFirestoreReports(
  * Upsert a single report in Firestore
  */
 export async function saveReportToFirestore(report: ModReportItem): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = `reports/${report.id}`;
   try {
     await setDoc(doc(db, 'reports', report.id), {
@@ -176,8 +216,11 @@ export async function saveReportToFirestore(report: ModReportItem): Promise<void
       syncedAt: new Date().toISOString(),
     });
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
-    throw error;
   }
 }
 
@@ -185,6 +228,7 @@ export async function saveReportToFirestore(report: ModReportItem): Promise<void
  * Batch upload reports to Firestore (used on initial seed or cloud sync)
  */
 export async function batchSyncReportsToFirestore(reports: ModReportItem[]): Promise<number> {
+  if (!reports || reports.length === 0 || firestoreQuotaExceededState) return 0;
   const path = 'reports';
   try {
     const batch = writeBatch(db);
@@ -204,8 +248,12 @@ export async function batchSyncReportsToFirestore(reports: ModReportItem[]): Pro
     await batch.commit();
     return count;
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return 0;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
-    throw error;
+    return 0;
   }
 }
 
@@ -213,12 +261,16 @@ export async function batchSyncReportsToFirestore(reports: ModReportItem[]): Pro
  * Delete a report from Firestore
  */
 export async function deleteReportFromFirestore(reportId: string): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = `reports/${reportId}`;
   try {
     await deleteDoc(doc(db, 'reports', reportId));
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
   }
 }
 
@@ -226,6 +278,7 @@ export async function deleteReportFromFirestore(reportId: string): Promise<void>
  * Clear all reports from Firestore
  */
 export async function clearAllReportsFromFirestore(): Promise<number> {
+  if (firestoreQuotaExceededState) return 0;
   const path = 'reports';
   try {
     const snap = await getDocs(collection(db, path));
@@ -239,6 +292,10 @@ export async function clearAllReportsFromFirestore(): Promise<number> {
     await batch.commit();
     return count;
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return 0;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
     return 0;
   }
@@ -277,12 +334,16 @@ export function subscribeToFirestoreUsers(
  * Upsert a user in Firestore
  */
 export async function saveUserToFirestore(user: UserProfile): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = `users/${user.id}`;
   try {
     await setDoc(doc(db, 'users', user.id), user);
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
-    throw error;
   }
 }
 
@@ -290,6 +351,7 @@ export async function saveUserToFirestore(user: UserProfile): Promise<void> {
  * Batch seed initial users to Firestore if collection is empty
  */
 export async function seedUsersToFirestore(users: UserProfile[]): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = 'users';
   try {
     const snap = await getDocs(collection(db, path));
@@ -301,6 +363,10 @@ export async function seedUsersToFirestore(users: UserProfile[]): Promise<void> 
       await batch.commit();
     }
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
   }
 }
@@ -309,12 +375,16 @@ export async function seedUsersToFirestore(users: UserProfile[]): Promise<void> 
  * Delete a user from Firestore
  */
 export async function deleteUserFromFirestore(userId: string): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = `users/${userId}`;
   try {
     await deleteDoc(doc(db, 'users', userId));
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.DELETE, path);
-    throw error;
   }
 }
 
@@ -346,12 +416,16 @@ export function subscribeToFirestoreSettings(
  * Save System Settings to Firestore
  */
 export async function saveSettingsToFirestore(settings: SystemSettings): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = 'settings/system';
   try {
     await setDoc(doc(db, 'settings', 'system'), settings);
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.WRITE, path);
-    throw error;
   }
 }
 
@@ -386,10 +460,15 @@ export function subscribeToFirestoreAuditLogs(
  * Add Audit Log to Firestore
  */
 export async function addAuditLogToFirestore(log: SystemAuditLog): Promise<void> {
+  if (firestoreQuotaExceededState) return;
   const path = `audit_logs/${log.id}`;
   try {
     await setDoc(doc(db, 'audit_logs', log.id), log);
   } catch (error) {
+    if (isQuotaExceededError(error)) {
+      setFirestoreQuotaExceeded(true);
+      return;
+    }
     handleFirestoreError(error, OperationType.CREATE, path);
   }
 }

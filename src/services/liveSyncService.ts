@@ -1,5 +1,6 @@
 import { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from '../types';
 import { normalizeSystemSettings } from './systemSettingsService';
+import { saveReports } from './storageService';
 
 const SYNC_VERSION_KEY = 'mod_report_client_sync_version_v1';
 const ALL_USERS_STORAGE_KEY = 'mod_report_all_users_v3';
@@ -49,7 +50,7 @@ export function applyDatabaseSync(data: FullSyncPayload): void {
     }
 
     if (Array.isArray(data.reports)) {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data.reports));
+      saveReports(data.reports);
       window.dispatchEvent(new CustomEvent('logar_reports_updated', { detail: data.reports }));
     }
 

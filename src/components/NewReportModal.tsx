@@ -97,7 +97,7 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
   const [shift, setShift] = useState<ShiftType>('Sore (15:00 - 23:00)');
   const [location, setLocation] = useState(HOTEL_LOCATIONS[0]);
   const [customLocation, setCustomLocation] = useState('');
-  const [problem, setProblem] = useState('Sikon aman dan kondusif');
+  const [problem, setProblem] = useState('');
   const [followUpDept, setFollowUpDept] = useState<Department>('None');
   const [status, setStatus] = useState<ReportStatus>('Aman');
   const [priority, setPriority] = useState<PriorityLevel>('Rendah');
@@ -200,7 +200,7 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
     e.preventDefault();
 
     const finalLocation = customLocation.trim() || location;
-    const finalProblem = problem.trim() || 'Sikon aman';
+    const finalProblem = problem.trim();
 
     // Area Grouping
     const locLower = finalLocation.toLowerCase();
@@ -446,7 +446,7 @@ export const NewReportModal: React.FC<NewReportModalProps> = ({
               rows={3}
               value={problem}
               onChange={(e) => setProblem(e.target.value)}
-              placeholder="Contoh: Sikon aman / Rembesan dinding koridor / Lampu mati / Persiapan meeting / Banyak tamu berenang..."
+              placeholder="Ketik catatan temuan atau kondisi lapangan di sini (cth: Rembesan dinding koridor, lampu mati, persiapan meeting, sikon area)..."
               required
               className="w-full px-3 py-2 text-xs rounded-xl border border-[#D9DF98] bg-[#FAFBF5] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#95A823]/20 focus:border-[#95A823] text-[#231E1B]"
             />

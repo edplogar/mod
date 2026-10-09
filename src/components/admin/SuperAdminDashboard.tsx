@@ -220,7 +220,7 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
 
   // Filtered Users
   const filteredUsers = useMemo(() => {
-    return users.filter(u => {
+    const list = users.filter(u => {
       if (userSearch) {
         const q = userSearch.toLowerCase();
         const mName = u.name.toLowerCase().includes(q);
@@ -229,6 +229,13 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
         if (!mName && !mEmail && !mDept) return false;
       }
       if (roleFilter !== 'all' && u.role !== roleFilter) return false;
+      return true;
+    });
+
+    const seen = new Set<string>();
+    return list.filter(u => {
+      if (!u || !u.id || seen.has(u.id)) return false;
+      seen.add(u.id);
       return true;
     });
   }, [users, userSearch, roleFilter]);

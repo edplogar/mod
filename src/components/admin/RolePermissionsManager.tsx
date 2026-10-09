@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   ShieldCheck, 
   KeyRound, 
@@ -332,11 +332,19 @@ export const RolePermissionsManager: React.FC<RolePermissionsManagerProps> = ({
   const selectedUser = users.find(u => u.id === selectedUserId) || users[0];
   const userOverride = selectedUser ? permissions.userOverrides?.[selectedUser.id] : undefined;
 
-  const filteredUsers = users.filter(u => 
-    u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-    u.role.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
-    u.department.toLowerCase().includes(userSearchQuery.toLowerCase())
-  );
+  const filteredUsers = useMemo<UserProfile[]>(() => {
+    const list = users.filter((u: UserProfile) => 
+      u.name.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      u.role.toLowerCase().includes(userSearchQuery.toLowerCase()) ||
+      u.department.toLowerCase().includes(userSearchQuery.toLowerCase())
+    );
+    const seen = new Set<string>();
+    return list.filter((u: UserProfile): u is UserProfile => {
+      if (!u || !u.id || seen.has(u.id)) return false;
+      seen.add(u.id);
+      return true;
+    });
+  }, [users, userSearchQuery]);
 
   return (
     <div className="space-y-6">

@@ -239,52 +239,124 @@ const SUPER_ADMIN_SESSION_STORAGE = 'mod_report_admin_session_v1';
 export const DEFAULT_SUPER_ADMIN_KEY = 'LOGAR-ADMIN-2026';
 export const DEFAULT_SUPER_ADMIN_PIN = '778899';
 
+/**
+ * Deduplicates user profiles strictly by ID, username, and email.
+ * Prevents duplicate React keys and identical records in storage.
+ */
+export function deduplicateUsers(users: UserProfile[]): UserProfile[] {
+  if (!Array.isArray(users)) return [];
+
+  const mapById = new Map<string, UserProfile>();
+  const seenUsernames = new Map<string, string>(); // username -> canonical id
+  const seenEmails = new Map<string, string>(); // email -> canonical id
+
+  for (const rawUser of users) {
+    if (!rawUser || !rawUser.id) continue;
+    const cleanId = String(rawUser.id).trim();
+    const cleanUsername = (rawUser.username || rawUser.email?.split('@')[0] || cleanId).trim().toLowerCase();
+    const cleanEmail = (rawUser.email || '').trim().toLowerCase();
+
+    // 1. If ID already seen, merge fields without duplicating entry
+    if (mapById.has(cleanId)) {
+      const existing = mapById.get(cleanId)!;
+      mapById.set(cleanId, {
+        ...existing,
+        ...rawUser,
+        username: existing.username || rawUser.username,
+        password: rawUser.password || existing.password,
+      });
+      continue;
+    }
+
+    // 2. If username matches an existing user under another ID, merge into that existing user
+    if (cleanUsername && seenUsernames.has(cleanUsername)) {
+      const canonicalId = seenUsernames.get(cleanUsername)!;
+      if (mapById.has(canonicalId)) {
+        const existing = mapById.get(canonicalId)!;
+        mapById.set(canonicalId, {
+          ...existing,
+          ...rawUser,
+          id: canonicalId,
+        });
+        continue;
+      }
+    }
+
+    // 3. If email matches an existing user, merge into that user
+    if (cleanEmail && seenEmails.has(cleanEmail)) {
+      const canonicalId = seenEmails.get(cleanEmail)!;
+      if (mapById.has(canonicalId)) {
+        const existing = mapById.get(canonicalId)!;
+        mapById.set(canonicalId, {
+          ...existing,
+          ...rawUser,
+          id: canonicalId,
+        });
+        continue;
+      }
+    }
+
+    // 4. Register new unique user
+    mapById.set(cleanId, { ...rawUser });
+    if (cleanUsername) seenUsernames.set(cleanUsername, cleanId);
+    if (cleanEmail) seenEmails.set(cleanEmail, cleanId);
+  }
+
+  return Array.from(mapById.values());
+}
+
 export function getAllUsers(): UserProfile[] {
   try {
     const raw = localStorage.getItem(ALL_USERS_STORAGE_KEY);
     if (raw) {
       const parsed: UserProfile[] = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
+        // First deduplicate loaded records
+        const deduplicatedRaw = deduplicateUsers(parsed);
+
         // Ensure all users have username and password
-        let needsSave = false;
-        let normalized = parsed.map(u => {
+        let normalized = deduplicatedRaw.map(u => {
           let updated = { ...u };
           if (!updated.username) {
             updated.username = u.email ? u.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() : u.id;
-            needsSave = true;
           }
           if (!updated.password) {
             updated.password = updated.role === 'Super Admin' ? 'admin123' : 'logar123';
-            needsSave = true;
           }
           return updated;
         });
 
-        // Ensure newly registered initial hotel staff (e.g. Kresna, Sukmajaya) are present
+        // Ensure newly registered initial hotel staff (e.g. Kresna, Sukmajaya) are present without duplicating
+        const existingIds = new Set(normalized.map(u => u.id));
         const existingUsernames = new Set(normalized.map(u => (u.username || '').toLowerCase()));
-        const missingInitial = INITIAL_HOTEL_USERS.filter(u => !existingUsernames.has(u.username.toLowerCase()));
+        const missingInitial = INITIAL_HOTEL_USERS.filter(u => 
+          !existingIds.has(u.id) && !existingUsernames.has(u.username.toLowerCase())
+        );
+
         if (missingInitial.length > 0) {
           normalized = [...normalized, ...missingInitial];
-          needsSave = true;
         }
 
-        if (needsSave) {
-          saveAllUsers(normalized);
-        }
-        return normalized;
+        const finalUniqueUsers = deduplicateUsers(normalized);
+
+        // Always save clean deduplicated list
+        saveAllUsers(finalUniqueUsers);
+        return finalUniqueUsers;
       }
     }
   } catch (e) {
     console.error('Failed reading user database', e);
   }
 
-  saveAllUsers(INITIAL_HOTEL_USERS);
-  return INITIAL_HOTEL_USERS;
+  const initialUnique = deduplicateUsers(INITIAL_HOTEL_USERS);
+  saveAllUsers(initialUnique);
+  return initialUnique;
 }
 
 export function saveAllUsers(users: UserProfile[]): void {
   try {
-    localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(users));
+    const clean = deduplicateUsers(users);
+    localStorage.setItem(ALL_USERS_STORAGE_KEY, JSON.stringify(clean));
   } catch (e) {
     console.error('Failed saving user database', e);
   }
@@ -391,9 +463,10 @@ export function deleteUser(id: string): boolean {
 
 export function setUsersFromCloud(cloudUsers: UserProfile[]): void {
   if (!cloudUsers || cloudUsers.length === 0) return;
-  saveAllUsers(cloudUsers);
+  const clean = deduplicateUsers(cloudUsers);
+  saveAllUsers(clean);
   try {
-    window.dispatchEvent(new CustomEvent('logar_users_updated', { detail: cloudUsers }));
+    window.dispatchEvent(new CustomEvent('logar_users_updated', { detail: clean }));
   } catch {
     // ignore in non-browser
   }

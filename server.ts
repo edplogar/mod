@@ -107,12 +107,23 @@ try {
           db.settings.branding.brandSubtitle = 'MOD REPORT LOGAR';
         }
       }
-      // Ensure all initial hotel users (e.g. Kresna, Sukmajaya) are present
-      const existingUsernames = new Set(db.users.map(u => (u.username || '').toLowerCase()));
-      const missingUsers = INITIAL_HOTEL_USERS.filter(u => !existingUsernames.has(u.username.toLowerCase()));
-      if (missingUsers.length > 0) {
-        db.users = [...db.users, ...missingUsers];
+      // Ensure all initial hotel users (e.g. Kresna, Sukmajaya) are present without duplicates
+      const mapById = new Map<string, UserProfile>();
+      const seenUsernames = new Map<string, string>();
+      for (const u of [...db.users, ...INITIAL_HOTEL_USERS]) {
+        if (!u || !u.id) continue;
+        const uId = String(u.id).trim();
+        const uName = (u.username || '').trim().toLowerCase();
+        if (mapById.has(uId)) {
+          const ex = mapById.get(uId)!;
+          mapById.set(uId, { ...ex, ...u });
+          continue;
+        }
+        if (uName && seenUsernames.has(uName)) continue;
+        mapById.set(uId, u);
+        if (uName) seenUsernames.set(uName, uId);
       }
+      db.users = Array.from(mapById.values());
 
       saveDatabaseToDisk();
       console.log(`[DB] Database loaded from disk. Users: ${db.users.length}, Reports: ${db.reports.length}, Version: ${db.version}`);

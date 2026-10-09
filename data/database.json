@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "updatedAt": "2026-10-02T03:20:54.609Z",
+  "updatedAt": "2026-10-09T07:22:28.800Z",
   "users": [
     {
       "id": "user-superadmin",
@@ -183,6 +183,48 @@
       "status": "active",
       "createdAt": "2025-12-01",
       "lastActive": "Aktif bertugas"
+    },
+    {
+      "id": "user-mod-rusdi",
+      "username": "rusdi",
+      "password": "logar123",
+      "name": "Rusdi",
+      "email": "rusdi@lombokgardenhotel.com",
+      "role": "MOD Officer",
+      "department": "Security",
+      "avatar": "https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80",
+      "phone": "+62 819-3903-5566",
+      "status": "active",
+      "createdAt": "2025-12-01",
+      "lastActive": "Hari ini"
+    },
+    {
+      "id": "user-mod-kazwini",
+      "username": "kazwini",
+      "password": "logar123",
+      "name": "Kazwini",
+      "email": "kazwini@lombokgardenhotel.com",
+      "role": "MOD Officer",
+      "department": "FB Service",
+      "avatar": "https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80",
+      "phone": "+62 878-3904-6677",
+      "status": "active",
+      "createdAt": "2025-12-01",
+      "lastActive": "Hari ini"
+    },
+    {
+      "id": "user-mod-mujaddid",
+      "username": "mujaddid",
+      "password": "logar123",
+      "name": "Ahmad Mujaddid",
+      "email": "mujaddid@lombokgardenhotel.com",
+      "role": "MOD Officer",
+      "department": "Engineering",
+      "avatar": "https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80",
+      "phone": "+62 812-3905-7788",
+      "status": "active",
+      "createdAt": "2025-12-01",
+      "lastActive": "Hari ini"
     }
   ],
   "reports": [
@@ -6483,7 +6525,17 @@
       "Security",
       "Front Office",
       "General"
-    ]
+    ],
+    "branding": {
+      "logoUrl": "/logo-emblem.svg",
+      "logoShape": "rounded",
+      "bgColor": "#16A34A",
+      "tagline": "Experience the Green of the City",
+      "brandTitle": "LOMBOK GARDEN HOTEL",
+      "brandSubtitle": "MOD REPORT LOGAR",
+      "badgeText": "MOD",
+      "customIconType": "default_flower"
+    }
   },
   "auditLogs": [
     {

@@ -155,6 +155,76 @@ export const INITIAL_HOTEL_USERS: UserProfile[] = [
     status: 'active',
     createdAt: '2026-04-05',
     lastActive: 'Hari ini',
+  },
+  {
+    id: 'user-mod-kresna',
+    username: 'kresna',
+    password: 'logar123',
+    name: 'I Wayan kresna',
+    email: 'kresna@lombokgardenhotel.com',
+    role: 'MOD Officer',
+    department: 'Housekeeping',
+    avatar: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=150&auto=format&fit=crop&q=80',
+    phone: '+62 812-3901-2233',
+    status: 'active',
+    createdAt: '2025-12-01',
+    lastActive: 'Aktif bertugas',
+  },
+  {
+    id: 'user-mod-sukmajaya',
+    username: 'sukmajaya',
+    password: 'logar123',
+    name: 'I GD Sukmajaya',
+    email: 'sukmajaya@lombokgardenhotel.com',
+    role: 'MOD Officer',
+    department: 'Engineering',
+    avatar: 'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=150&auto=format&fit=crop&q=80',
+    phone: '+62 813-3902-4455',
+    status: 'active',
+    createdAt: '2025-12-01',
+    lastActive: 'Aktif bertugas',
+  },
+  {
+    id: 'user-mod-rusdi',
+    username: 'rusdi',
+    password: 'logar123',
+    name: 'Rusdi',
+    email: 'rusdi@lombokgardenhotel.com',
+    role: 'MOD Officer',
+    department: 'Security',
+    avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&auto=format&fit=crop&q=80',
+    phone: '+62 819-3903-5566',
+    status: 'active',
+    createdAt: '2025-12-01',
+    lastActive: 'Hari ini',
+  },
+  {
+    id: 'user-mod-kazwini',
+    username: 'kazwini',
+    password: 'logar123',
+    name: 'Kazwini',
+    email: 'kazwini@lombokgardenhotel.com',
+    role: 'MOD Officer',
+    department: 'FB Service',
+    avatar: 'https://images.unsplash.com/photo-1570295999919-56ceb5ecca61?w=150&auto=format&fit=crop&q=80',
+    phone: '+62 878-3904-6677',
+    status: 'active',
+    createdAt: '2025-12-01',
+    lastActive: 'Hari ini',
+  },
+  {
+    id: 'user-mod-mujaddid',
+    username: 'mujaddid',
+    password: 'logar123',
+    name: 'Ahmad Mujaddid',
+    email: 'mujaddid@lombokgardenhotel.com',
+    role: 'MOD Officer',
+    department: 'Engineering',
+    avatar: 'https://images.unsplash.com/photo-1522075469751-3a6694fb2f61?w=150&auto=format&fit=crop&q=80',
+    phone: '+62 812-3905-7788',
+    status: 'active',
+    createdAt: '2025-12-01',
+    lastActive: 'Hari ini',
   }
 ];
 
@@ -177,7 +247,7 @@ export function getAllUsers(): UserProfile[] {
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Ensure all users have username and password
         let needsSave = false;
-        const normalized = parsed.map(u => {
+        let normalized = parsed.map(u => {
           let updated = { ...u };
           if (!updated.username) {
             updated.username = u.email ? u.email.split('@')[0].replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() : u.id;
@@ -189,6 +259,14 @@ export function getAllUsers(): UserProfile[] {
           }
           return updated;
         });
+
+        // Ensure newly registered initial hotel staff (e.g. Kresna, Sukmajaya) are present
+        const existingUsernames = new Set(normalized.map(u => (u.username || '').toLowerCase()));
+        const missingInitial = INITIAL_HOTEL_USERS.filter(u => !existingUsernames.has(u.username.toLowerCase()));
+        if (missingInitial.length > 0) {
+          normalized = [...normalized, ...missingInitial];
+          needsSave = true;
+        }
 
         if (needsSave) {
           saveAllUsers(normalized);

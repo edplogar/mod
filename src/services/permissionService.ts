@@ -43,12 +43,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'Duty Manager': {
     role: 'Duty Manager',
     displayName: 'Duty Manager (DM)',
-    description: 'Pimpinan operasional harian: pemantauan area, tindak lanjut temuan, dan disposisi departemen',
+    description: 'Pimpinan operasional harian: pemantauan area, input temuan, tindak lanjut temuan, dan disposisi departemen',
     canAccessDashboard: true,
     canAccessReports: true,
-    canCreateReport: false,
+    canCreateReport: true,
     canExportPdf: true,
-    canSyncCloud: false,
+    canSyncCloud: true,
     canEditReportStatus: true,
     canDeleteReport: false,
     canAccessSuperAdmin: false,
@@ -56,12 +56,12 @@ export const DEFAULT_ROLE_PERMISSIONS: Record<UserRole, RolePermissionConfig> = 
   'MOD Officer': {
     role: 'MOD Officer',
     displayName: 'Petugas MOD (Manager on Duty)',
-    description: 'Petugas piket inspeksi fisik hotel: dasbor visual operasional dan monitoring temuan patroli',
+    description: 'Petugas piket inspeksi fisik hotel: input laporan inspeksi, dasbor visual operasional, dan monitoring temuan patroli',
     canAccessDashboard: true,
-    canAccessReports: false,
-    canCreateReport: false,
-    canExportPdf: false,
-    canSyncCloud: false,
+    canAccessReports: true,
+    canCreateReport: true,
+    canExportPdf: true,
+    canSyncCloud: true,
     canEditReportStatus: true,
     canDeleteReport: false,
     canAccessSuperAdmin: false,
@@ -161,6 +161,12 @@ export function getStoredPermissions(): SystemPermissionsState {
         for (const role of ALL_SYSTEM_ROLES) {
           if (parsed.roles[role]) {
             mergedRoles[role] = { ...DEFAULT_ROLE_PERMISSIONS[role], ...parsed.roles[role] };
+            // Ensure MOD Officer and Duty Manager keep essential report creation and viewing rights
+            if (role === 'MOD Officer' || role === 'Duty Manager') {
+              mergedRoles[role].canCreateReport = true;
+              mergedRoles[role].canAccessReports = true;
+              mergedRoles[role].canAccessDashboard = true;
+            }
           }
         }
         return {
@@ -329,6 +335,20 @@ export function getUserPermissions(
     }
 
     return combined;
+  }
+
+  // Ensure Kresna and Sukmajaya have guaranteed operational permissions even without explicit override
+  const userIdentifier = `${user.id || ''} ${user.username || ''} ${user.name || ''}`.toLowerCase();
+  if (userIdentifier.includes('kresna') || userIdentifier.includes('sukmajaya')) {
+    return {
+      ...roleBase,
+      canAccessDashboard: true,
+      canAccessReports: true,
+      canCreateReport: true,
+      canEditReportStatus: true,
+      canExportPdf: true,
+      canSyncCloud: true,
+    };
   }
 
   return roleBase;

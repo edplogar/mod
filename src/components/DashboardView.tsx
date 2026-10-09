@@ -116,7 +116,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   // Enforce removal of all records prior to October 2026
   const postOctoberReports = useMemo(() => {
-    return reports.filter(r => isDateOnOrAfterOctober2026(r.date || r.timestamp));
+    return reports.filter(r => {
+      const dateVal = r.date || r.timestamp || '';
+      if (dateVal.includes('2025')) return false;
+      return isDateOnOrAfterOctober2026(dateVal);
+    });
   }, [reports]);
 
   // Dynamically extract month list from valid reports (>= October 2026), guaranteeing active October 2026 is present

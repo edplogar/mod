@@ -20,6 +20,11 @@ if (!fs.existsSync(DATA_DIR)) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
 }
 
+const UPLOADS_DIR = path.resolve(DATA_DIR, 'uploads');
+if (!fs.existsSync(UPLOADS_DIR)) {
+  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+}
+
 const DB_FILE = path.join(DATA_DIR, 'database.json');
 
 interface MasterCredentials {
@@ -102,6 +107,13 @@ try {
           db.settings.branding.brandSubtitle = 'MOD REPORT LOGAR';
         }
       }
+      // Ensure all initial hotel users (e.g. Kresna, Sukmajaya) are present
+      const existingUsernames = new Set(db.users.map(u => (u.username || '').toLowerCase()));
+      const missingUsers = INITIAL_HOTEL_USERS.filter(u => !existingUsernames.has(u.username.toLowerCase()));
+      if (missingUsers.length > 0) {
+        db.users = [...db.users, ...missingUsers];
+      }
+
       saveDatabaseToDisk();
       console.log(`[DB] Database loaded from disk. Users: ${db.users.length}, Reports: ${db.reports.length}, Version: ${db.version}`);
     } else {
@@ -169,6 +181,76 @@ app.use((req, res, next) => {
     return res.sendStatus(200);
   }
   next();
+});
+
+// Serve uploaded inspection photos statically
+app.use('/uploads', express.static(UPLOADS_DIR));
+
+// Photo Upload Endpoint: Saves photo permanently to disk and uploads to Google Drive webhook if available
+app.post('/api/upload-photo', async (req: Request, res: Response) => {
+  try {
+    const { base64Data, dataUrl, fileName, folderId } = req.body;
+    let rawBase64 = base64Data || '';
+    if (!rawBase64 && dataUrl && typeof dataUrl === 'string') {
+      rawBase64 = dataUrl.includes('base64,') ? dataUrl.split('base64,')[1] : dataUrl;
+    }
+
+    if (!rawBase64) {
+      return res.status(400).json({ error: 'Data foto base64 tidak ditemukan' });
+    }
+
+    const cleanFolderId = folderId || db.settings.driveFolderId || '1LG_MOD_DRIVE_FOLDER_2026';
+    const timestamp = Date.now();
+    const cleanFileName = (fileName || `MOD_INSPECTION_${timestamp}.jpg`).replace(/[^a-zA-Z0-9_.-]/g, '_');
+    const localFileName = `photo_${timestamp}_${cleanFileName}`;
+    const filePath = path.join(UPLOADS_DIR, localFileName);
+
+    const buffer = Buffer.from(rawBase64, 'base64');
+    fs.writeFileSync(filePath, buffer);
+
+    const localUrl = `/uploads/${localFileName}`;
+    let driveUrl = `https://drive.google.com/drive/folders/${cleanFolderId}`;
+    let driveId = `file-${timestamp}`;
+
+    // If Google Apps Script Webhook is configured, forward photo to Google Drive
+    const webhookUrl = db.settings.driveWebhookUrl;
+    if (webhookUrl && webhookUrl.trim().startsWith('http')) {
+      try {
+        const driveRes = await fetch(webhookUrl.trim(), {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          body: JSON.stringify({
+            action: 'upload_image',
+            folderId: cleanFolderId,
+            fileName: cleanFileName,
+            mimeType: 'image/jpeg',
+            base64Data: rawBase64,
+          }),
+        });
+
+        const driveJson = await driveRes.json() as any;
+        if (driveJson && (driveJson.status === 'success' || driveJson.fileId)) {
+          driveId = driveJson.fileId || driveId;
+          driveUrl = driveJson.fileUrl || `https://drive.google.com/file/d/${driveJson.fileId}/view`;
+        }
+      } catch (webhookErr) {
+        console.warn('[Google Drive Webhook] Photo forwarding deferred:', webhookErr);
+      }
+    }
+
+    return res.json({
+      success: true,
+      url: localUrl,
+      driveUrl,
+      driveId,
+      driveFolderId: cleanFolderId,
+      fileName: cleanFileName,
+      sizeBytes: buffer.length,
+    });
+  } catch (err: any) {
+    console.error('Error uploading photo:', err);
+    return res.status(500).json({ error: err.message || 'Gagal menyimpan foto' });
+  }
 });
 
 // --- API ENDPOINTS ---

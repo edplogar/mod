@@ -220,8 +220,10 @@ export const RAW_MOD_CSV = `Timestamp,Name,Date,Location,Problem,Follow Up,Pictu
 10/3/2026 15:40:00,Ahmad Mujaddid,10/3/2026 15:20:00,Parkir Karyawan & Loker,Pemeriksaan loker karyawan bersih dan tertib security siaga,,`;
 
 export function isDateOnOrAfterOctober2026(dateStr: string): boolean {
-  if (!dateStr) return false;
+  if (!dateStr) return true;
   const clean = dateStr.trim().split(' ')[0];
+  if (clean.includes('2025')) return false;
+
   const parts = clean.split(/[\/\-]/);
   if (parts.length >= 3) {
     if (parts[0].length === 4) {
@@ -230,10 +232,15 @@ export function isDateOnOrAfterOctober2026(dateStr: string): boolean {
       const m = parseInt(parts[1], 10);
       return y > 2026 || (y === 2026 && m >= 10);
     }
-    // M/D/YYYY
-    const m = parseInt(parts[0], 10);
+    // D/M/YYYY or M/D/YYYY
+    const p0 = parseInt(parts[0], 10);
+    const p1 = parseInt(parts[1], 10);
     const y = parseInt(parts[2], 10);
-    return y > 2026 || (y === 2026 && m >= 10);
+    if (isNaN(y)) return true;
+    if (y > 2026) return true;
+    if (y < 2026) return false;
+    // Year 2026: check if either part indicates month >= 10 (October, November, December)
+    return p0 >= 10 || p1 >= 10;
   }
   const d = new Date(dateStr);
   if (!isNaN(d.getTime())) {
@@ -241,7 +248,7 @@ export function isDateOnOrAfterOctober2026(dateStr: string): boolean {
     const m = d.getMonth() + 1;
     return y > 2026 || (y === 2026 && m >= 10);
   }
-  return false;
+  return true;
 }
 
 export function parseCSVToReports(csv: string): ModReportItem[] {

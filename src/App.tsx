@@ -21,6 +21,7 @@ import {
   setUsersFromCloud
 } from './services/authService';
 import { setSettingsFromCloud } from './services/systemSettingsService';
+import { startLiveDatabaseSync } from './services/liveSyncService';
 import { 
   subscribeToFirestoreReports, 
   subscribeToFirestoreUsers, 
@@ -179,7 +180,11 @@ export default function App() {
     };
     window.addEventListener('logar_firestore_quota_exceeded', handleQuotaExceeded);
 
+    // Start real-time server database SSE synchronization & polling
+    const stopLiveSync = startLiveDatabaseSync();
+
     return () => {
+      stopLiveSync();
       unsubReports();
       unsubUsers();
       unsubSettings();
@@ -253,6 +258,15 @@ export default function App() {
     saveReports(updated);
     setSyncState(getSyncState(updated));
 
+    // Instant server-side multi-device synchronization via REST API
+    fetch('/api/reports', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ report: newReport }),
+    }).catch(err => {
+      console.warn('Real-time server sync deferred:', err);
+    });
+
     // Real-time Firestore sync across all devices & IPs
     saveReportToFirestore(newReport).catch(err => {
       console.warn('Real-time Firestore write deferred:', err);
@@ -312,6 +326,15 @@ export default function App() {
     setSyncState(getSyncState(updated));
 
     if (targetReport) {
+      // Instant server-side multi-device update
+      fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ report: targetReport }),
+      }).catch(err => {
+        console.warn('Real-time server status update deferred:', err);
+      });
+
       // Real-time Firestore update across all devices & IPs
       saveReportToFirestore(targetReport).catch(err => {
         console.warn('Real-time Firestore update deferred:', err);
@@ -327,6 +350,13 @@ export default function App() {
     setReports(updated);
     saveReports(updated);
     setSyncState(getSyncState(updated));
+
+    // Instant server-side multi-device delete
+    fetch(`/api/reports/${reportId}`, {
+      method: 'DELETE',
+    }).catch(err => {
+      console.warn('Real-time server delete deferred:', err);
+    });
 
     // Real-time Firestore delete across all devices & IPs
     deleteReportFromFirestore(reportId).catch(err => {

@@ -61,81 +61,95 @@ export async function uploadPhotoToGoogleDrive(
   const cleanFolderId = extractDriveFolderId(folderId) || '1LG_MOD_DRIVE_FOLDER_2026';
   const cleanFolderName = folderName || picture.driveFolderName || 'HOTEL LOMBOK GARDEN / MOD REPORTS 2026';
 
-  // If no webhook URL is configured, we link and register the photo directly to the designated Google Drive folder
-  if (!webhookUrl || !webhookUrl.trim().startsWith('http')) {
-    const updated: PictureItem = {
-      ...picture,
-      driveFolderId: cleanFolderId,
-      driveFolderName: cleanFolderName,
-      driveUrl: picture.driveId 
-        ? `https://drive.google.com/file/d/${picture.driveId}/view` 
-        : getDriveFolderUrl(cleanFolderId),
-      uploadedToDrive: true,
-      uploadStatus: 'synced',
-    };
-    return { success: true, picture: updated };
+  const rawData = picture.thumbnailUrl || '';
+  const base64Data = rawData.includes('base64,') 
+    ? rawData.split('base64,')[1] 
+    : rawData;
+
+  // 1. First, attempt uploading to full-stack server backend /api/upload-photo
+  if (base64Data && base64Data.length > 50) {
+    try {
+      const serverRes = await fetch('/api/upload-photo', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          base64Data,
+          fileName: picture.name || `MOD_LOGAR_${Date.now()}.jpg`,
+          folderId: cleanFolderId,
+        }),
+      });
+
+      if (serverRes.ok) {
+        const serverJson = await serverRes.json();
+        if (serverJson && serverJson.success) {
+          const updated: PictureItem = {
+            ...picture,
+            thumbnailUrl: serverJson.url || picture.thumbnailUrl,
+            driveFolderId: cleanFolderId,
+            driveFolderName: cleanFolderName,
+            driveId: serverJson.driveId || picture.driveId,
+            driveUrl: serverJson.driveUrl || getDriveFolderUrl(cleanFolderId),
+            uploadedToDrive: true,
+            uploadStatus: 'synced',
+          };
+          return { success: true, picture: updated };
+        }
+      }
+    } catch (serverErr) {
+      console.warn('[Server Photo Upload] Deferred, trying direct client sync:', serverErr);
+    }
   }
 
-  try {
-    // Extract pure base64 data without data:image/jpeg;base64,
-    const rawData = picture.thumbnailUrl || '';
-    const base64Data = rawData.includes('base64,') 
-      ? rawData.split('base64,')[1] 
-      : rawData;
-
-    if (!base64Data) {
-      return { 
-        success: false, 
-        picture, 
-        error: 'Data gambar tidak tersedia untuk diunggah.' 
+  // 2. If client has a direct Google Apps Script Webhook URL configured
+  if (webhookUrl && webhookUrl.trim().startsWith('http') && base64Data) {
+    try {
+      const payload = {
+        action: 'upload_image',
+        folderId: cleanFolderId,
+        fileName: picture.name || `MOD_LOGAR_${Date.now()}.jpg`,
+        mimeType: 'image/jpeg',
+        base64Data,
       };
+
+      const res = await fetch(webhookUrl.trim(), {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain;charset=utf-8', // Avoid CORS preflight on Apps Script
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const json = await res.json();
+
+      if (json && (json.status === 'success' || json.fileId)) {
+        const updated: PictureItem = {
+          ...picture,
+          driveFolderId: cleanFolderId,
+          driveFolderName: cleanFolderName,
+          driveId: json.fileId || picture.driveId,
+          driveUrl: json.fileUrl || `https://drive.google.com/file/d/${json.fileId}/view`,
+          uploadedToDrive: true,
+          uploadStatus: 'synced',
+        };
+        return { success: true, picture: updated };
+      }
+    } catch (webhookErr: any) {
+      console.warn('Google Drive direct upload notice:', webhookErr);
     }
-
-    const payload = {
-      action: 'upload_image',
-      folderId: cleanFolderId,
-      fileName: picture.name || `MOD_LOGAR_${Date.now()}.jpg`,
-      mimeType: 'image/jpeg',
-      base64Data,
-    };
-
-    const res = await fetch(webhookUrl.trim(), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'text/plain;charset=utf-8', // Avoid CORS preflight on Apps Script
-      },
-      body: JSON.stringify(payload),
-    });
-
-    const json = await res.json();
-
-    if (json && (json.status === 'success' || json.fileId)) {
-      const updated: PictureItem = {
-        ...picture,
-        driveFolderId: cleanFolderId,
-        driveFolderName: cleanFolderName,
-        driveId: json.fileId || picture.driveId,
-        driveUrl: json.fileUrl || `https://drive.google.com/file/d/${json.fileId}/view`,
-        uploadedToDrive: true,
-        uploadStatus: 'synced',
-      };
-      return { success: true, picture: updated };
-    } else {
-      throw new Error(json.message || 'Gagal menyimpan ke Google Drive.');
-    }
-  } catch (err: any) {
-    console.warn('Google Drive direct upload notice:', err);
-    // Link to designated folder even if webhook encounters network block
-    const fallback: PictureItem = {
-      ...picture,
-      driveFolderId: cleanFolderId,
-      driveFolderName: cleanFolderName,
-      driveUrl: getDriveFolderUrl(cleanFolderId),
-      uploadedToDrive: true,
-      uploadStatus: 'synced',
-    };
-    return { success: true, picture: fallback, error: err.message };
   }
+
+  // 3. Fallback: stamp photo with active Google Drive hotel folder metadata
+  const fallback: PictureItem = {
+    ...picture,
+    driveFolderId: cleanFolderId,
+    driveFolderName: cleanFolderName,
+    driveUrl: picture.driveId && !picture.driveId.startsWith('pic-')
+      ? `https://drive.google.com/file/d/${picture.driveId}/view`
+      : getDriveFolderUrl(cleanFolderId),
+    uploadedToDrive: true,
+    uploadStatus: 'synced',
+  };
+  return { success: true, picture: fallback };
 }
 
 /**

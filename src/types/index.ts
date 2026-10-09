@@ -165,3 +165,30 @@ export interface SystemPermissionsState {
   updatedAt?: string;
   updatedBy?: string;
 }
+
+export type MembershipDuration = '1 Bulan' | '3 Bulan' | '6 Bulan' | '1 Tahun' | '2 Tahun' | 'Custom';
+export type MembershipCategory = 'Executive Club' | 'Gym & Swimming Pool' | 'Fitness & Gym' | 'Swimming Pool Only' | 'Family Package' | 'Family Wellness' | 'Spa & Wellness' | 'Silver' | 'Gold' | 'Platinum' | string;
+export type MembershipStatus = 'Aktif' | 'Kadaluarsa' | 'Ditangguhkan' | 'Suspended' | 'Segera Berakhir' | 'Hampir Habis';
+
+export interface HotelMember {
+  id: string;
+  memberNumber: string;
+  name: string;
+  email?: string;
+  phone?: string;
+  gender?: 'Laki-laki' | 'Perempuan';
+  category: MembershipCategory;
+  startDate: string;
+  duration: MembershipDuration;
+  expiryDate: string;
+  status: MembershipStatus;
+  avatar?: string;
+  address?: string;
+  idCardNumber?: string;
+  totalVisits?: number;
+  lastVisit?: string;
+  notes?: string;
+  registeredBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}

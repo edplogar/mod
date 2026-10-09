@@ -98,8 +98,10 @@ export const ReportListView: React.FC<ReportListViewProps> = ({
   // Filtered reports with real-time multi-field matching
   const filteredReports = useMemo(() => {
     return reports.filter(item => {
-      // Must be on or after October 2026
-      if (!isDateOnOrAfterOctober2026(item.date || item.timestamp)) return false;
+      // Must be on or after October 2026 (exclude 2025 historical seed data)
+      const dateVal = item.date || item.timestamp || '';
+      if (dateVal.includes('2025')) return false;
+      if (!isDateOnOrAfterOctober2026(dateVal)) return false;
 
       // Real-time search keyword
       if (searchTerm.trim()) {

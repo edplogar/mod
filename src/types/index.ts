@@ -90,6 +90,28 @@ export interface HotelBrandingConfig {
   updatedBy?: string;
 }
 
+export type DatabaseDriverType = 'sqlite_json' | 'postgresql' | 'mysql' | 'truenas_api' | 'firebase_firestore' | 'custom_rest';
+
+export interface DatabaseConnectionConfig {
+  driver: DatabaseDriverType;
+  status: 'connected' | 'disconnected' | 'testing' | 'error';
+  lastTestedAt?: string;
+  errorMessage?: string;
+  host: string;
+  port: number;
+  databaseName: string;
+  username: string;
+  password?: string;
+  ssl: boolean;
+  connectionTimeoutMs?: number;
+  trueNasDatasetPath?: string;
+  trueNasAppNamespace?: string;
+  trueNasApiToken?: string;
+  enableLocalFallback: boolean;
+  enableFirestoreDualSync: boolean;
+  autoExportBackupCron?: string;
+}
+
 export interface SystemSettings {
   hotelName: string;
   hotelAddress: string;
@@ -111,6 +133,7 @@ export interface SystemSettings {
   };
   locations: HotelLocationConfig[];
   departments: string[];
+  databaseConnection?: DatabaseConnectionConfig;
 }
 
 export interface SystemAuditLog {

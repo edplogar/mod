@@ -266,4 +266,20 @@ export const DEFAULT_SYSTEM_SETTINGS: SystemSettings = {
     };
   }),
   departments: [...HOTEL_DEPARTMENTS],
+  databaseConnection: {
+    driver: 'sqlite_json',
+    status: 'connected',
+    lastTestedAt: new Date().toISOString(),
+    host: 'localhost',
+    port: 5432,
+    databaseName: 'mod_report_logar',
+    username: 'postgres',
+    ssl: false,
+    connectionTimeoutMs: 5000,
+    trueNasDatasetPath: '/mnt/tank/apps/mod_report/data',
+    trueNasAppNamespace: 'ix-mod-report',
+    enableLocalFallback: true,
+    enableFirestoreDualSync: true,
+    autoExportBackupCron: 'Daily',
+  },
 };

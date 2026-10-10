@@ -1,4 +1,4 @@
-import { SystemSettings, SystemAuditLog, HotelLocationConfig, HotelBrandingConfig } from '../types/index.ts';
+import { SystemSettings, SystemAuditLog, HotelLocationConfig, HotelBrandingConfig, DatabaseConnectionConfig } from '../types/index.ts';
 import { HOTEL_LOCATIONS, HOTEL_DEPARTMENTS, RAW_MOD_CSV, parseCSVToReports } from '../data/initialData';
 import { saveReports, saveSyncConfig } from './storageService';
 import { saveAllUsers, INITIAL_HOTEL_USERS } from './authService';
@@ -7,6 +7,23 @@ import { saveSettingsToFirestore, addAuditLogToFirestore } from './firebase';
 
 const SETTINGS_STORAGE_KEY = 'mod_report_system_settings_v1';
 const AUDIT_LOG_STORAGE_KEY = 'mod_report_system_audit_logs_v1';
+
+export const DEFAULT_DATABASE_CONNECTION: DatabaseConnectionConfig = {
+  driver: 'sqlite_json',
+  status: 'connected',
+  lastTestedAt: new Date().toISOString(),
+  host: 'localhost',
+  port: 5432,
+  databaseName: 'mod_report_logar',
+  username: 'postgres',
+  ssl: false,
+  connectionTimeoutMs: 5000,
+  trueNasDatasetPath: '/mnt/tank/apps/mod_report/data',
+  trueNasAppNamespace: 'ix-mod-report',
+  enableLocalFallback: true,
+  enableFirestoreDualSync: true,
+  autoExportBackupCron: 'Daily',
+};
 
 export const DEFAULT_BRANDING: HotelBrandingConfig = {
   logoUrl: '/logo-emblem.svg',
@@ -46,6 +63,10 @@ export function normalizeSystemSettings(rawSettings?: any): SystemSettings {
     ...DEFAULT_SYSTEM_SETTINGS,
     ...rawSettings,
     branding: normalizeBranding(rawSettings.branding),
+    databaseConnection: {
+      ...DEFAULT_DATABASE_CONNECTION,
+      ...(rawSettings.databaseConnection || {}),
+    },
   };
 }
 
@@ -299,4 +320,159 @@ export function factoryResetSystem(actor: string = 'Super Admin'): void {
   saveAllUsers(INITIAL_HOTEL_USERS);
   saveSystemSettings(DEFAULT_SYSTEM_SETTINGS);
   addAuditLog('FACTORY_RESET', 'Sistem dibersihkan ke kondisi awal Hotel Lombok Garden', 'DATA', actor);
+}
+
+export async function testDatabaseConnectionApi(config: DatabaseConnectionConfig): Promise<{ ok: boolean; message: string; latencyMs?: number }> {
+  try {
+    const res = await fetch('/api/database/test', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config }),
+    });
+    return await res.json();
+  } catch (err: any) {
+    return { ok: false, message: 'Gagal menghubungi server backend: ' + (err.message || 'Network error') };
+  }
+}
+
+export function generateTrueNasComposeYaml(config: DatabaseConnectionConfig): string {
+  const isPostgres = config.driver === 'postgresql';
+  const isMySql = config.driver === 'mysql';
+  const datasetPath = config.trueNasDatasetPath || '/mnt/tank/apps/mod_report/data';
+  const dbName = config.databaseName || 'mod_report_logar';
+  const dbUser = config.username || (isPostgres ? 'postgres' : 'root');
+  const dbPort = config.port || (isPostgres ? 5432 : 3306);
+  const appPort = 3000;
+
+  if (isPostgres) {
+    return `# ==============================================================
+# TrueNAS SCALE - Docker Compose Configuration
+# Aplikasi: MOD REPORT LOGAR + Database PostgreSQL
+# ==============================================================
+version: '3.8'
+
+services:
+  # 1. Aplikasi MOD Report Hotel Lombok Garden
+  mod-report-app:
+    image: node:20-alpine
+    container_name: truenas-mod-report
+    restart: always
+    working_dir: /app
+    ports:
+      - "${appPort}:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_DRIVER=postgresql
+      - DB_HOST=mod-report-db
+      - DB_PORT=5432
+      - DB_NAME=${dbName}
+      - DB_USER=${dbUser}
+      - DB_PASSWORD=${config.password || 'logar123'}
+      - TRUENAS_DATASET=${datasetPath}
+    volumes:
+      # Mount TrueNAS ZFS Dataset untuk data persisten & foto
+      - "${datasetPath}:/app/data"
+      - "${datasetPath}/uploads:/app/uploads"
+    depends_on:
+      mod-report-db:
+        condition: service_healthy
+
+  # 2. Database PostgreSQL Dedicated Container
+  mod-report-db:
+    image: postgres:16-alpine
+    container_name: truenas-mod-postgres
+    restart: always
+    ports:
+      - "${dbPort}:5432"
+    environment:
+      - POSTGRES_DB=${dbName}
+      - POSTGRES_USER=${dbUser}
+      - POSTGRES_PASSWORD=${config.password || 'logar123'}
+    volumes:
+      # ZFS dataset untuk PostgreSQL WAL & Tablespaces
+      - "${datasetPath}/pgdata:/var/lib/postgresql/data"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${dbUser} -d ${dbName}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  default:
+    name: truenas-mod-network
+`;
+  }
+
+  if (isMySql) {
+    return `# ==============================================================
+# TrueNAS SCALE - Docker Compose Configuration
+# Aplikasi: MOD REPORT LOGAR + MariaDB / MySQL
+# ==============================================================
+version: '3.8'
+
+services:
+  mod-report-app:
+    image: node:20-alpine
+    container_name: truenas-mod-report
+    restart: always
+    working_dir: /app
+    ports:
+      - "${appPort}:3000"
+    environment:
+      - NODE_ENV=production
+      - DB_DRIVER=mysql
+      - DB_HOST=mod-report-db
+      - DB_PORT=3306
+      - DB_NAME=${dbName}
+      - DB_USER=${dbUser}
+      - DB_PASSWORD=${config.password || 'logar123'}
+    volumes:
+      - "${datasetPath}:/app/data"
+      - "${datasetPath}/uploads:/app/uploads"
+    depends_on:
+      - mod-report-db
+
+  mod-report-db:
+    image: mariadb:11-jammy
+    container_name: truenas-mod-mariadb
+    restart: always
+    ports:
+      - "${dbPort}:3306"
+    environment:
+      - MYSQL_DATABASE=${dbName}
+      - MYSQL_USER=${dbUser}
+      - MYSQL_PASSWORD=${config.password || 'logar123'}
+      - MYSQL_ROOT_PASSWORD=${config.password || 'logar123'}
+    volumes:
+      - "${datasetPath}/mysql:/var/lib/mysql"
+
+networks:
+  default:
+    name: truenas-mod-network
+`;
+  }
+
+  return `# ==============================================================
+# TrueNAS SCALE - Standalone Container dengan Local ZFS Storage
+# ==============================================================
+version: '3.8'
+
+services:
+  mod-report-app:
+    image: node:20-alpine
+    container_name: truenas-mod-report
+    restart: always
+    working_dir: /app
+    ports:
+      - "${appPort}:3000"
+    volumes:
+      # TrueNAS ZFS Dataset Storage Mount
+      - "${datasetPath}:/app/data"
+      - "${datasetPath}/uploads:/app/uploads"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DB_DRIVER=${config.driver}
+`;
 }

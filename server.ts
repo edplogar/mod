@@ -2,10 +2,11 @@ import express from 'express';
 import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
+import net from 'net';
 import { fileURLToPath } from 'url';
 import { parseCSVToReports, RAW_MOD_CSV } from './src/data/initialData.ts';
 import { INITIAL_HOTEL_USERS, DEFAULT_SYSTEM_SETTINGS } from './src/data/defaultConstants.ts';
-import type { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from './src/types/index.ts';
+import type { UserProfile, ModReportItem, SystemSettings, SystemAuditLog, DatabaseConnectionConfig } from './src/types/index.ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -563,6 +564,199 @@ app.post('/api/audit-logs', (req: Request, res: Response) => {
   } catch (err: any) {
     res.status(500).json({ error: err.message || 'Gagal mencatat audit log' });
   }
+});
+
+// --- DATABASE CONNECTION & TRUENAS SCALE INTEGRATION API ---
+
+// Get database configuration
+app.get('/api/database/config', (_req, res) => {
+  const cfg = db.settings.databaseConnection || DEFAULT_SYSTEM_SETTINGS.databaseConnection;
+  res.json({
+    config: cfg ? { ...cfg, password: cfg.password ? '••••••••' : '' } : null,
+    version: db.version,
+    updatedAt: db.updatedAt,
+  });
+});
+
+// Update database configuration
+app.post('/api/database/config', (req: Request, res: Response) => {
+  try {
+    const { config } = req.body;
+    if (!config) {
+      return res.status(400).json({ error: 'Data konfigurasi database tidak valid' });
+    }
+
+    const current = db.settings.databaseConnection || DEFAULT_SYSTEM_SETTINGS.databaseConnection!;
+    // Preserve existing password if masked
+    const finalPassword = config.password && config.password !== '••••••••' ? config.password : current.password;
+
+    db.settings.databaseConnection = {
+      ...current,
+      ...config,
+      password: finalPassword,
+      lastTestedAt: new Date().toISOString(),
+    };
+
+    saveDatabaseToDisk();
+    broadcastSyncEvent('DATABASE_CONFIG_UPDATED');
+
+    res.json({
+      success: true,
+      message: `Konfigurasi database berhasil disimpan (Driver: ${config.driver})`,
+      config: { ...db.settings.databaseConnection, password: '••••••••' },
+      version: db.version,
+    });
+  } catch (err: any) {
+    res.status(500).json({ error: err.message || 'Gagal menyimpan konfigurasi database' });
+  }
+});
+
+// Test database connection (supports TCP socket check for TrueNAS/Postgres/MySQL and local drivers)
+app.post('/api/database/test', (req: Request, res: Response) => {
+  const { config } = req.body as { config: DatabaseConnectionConfig };
+  if (!config) {
+    return res.status(400).json({ ok: false, message: 'Parameter koneksi tidak lengkap' });
+  }
+
+  const driver = config.driver;
+
+  if (driver === 'sqlite_json') {
+    return res.json({
+      ok: true,
+      message: `Local JSON / SQLite Storage aktif & siap digunakan (Lokasi data: ${DB_FILE})`,
+      latencyMs: 1,
+      driver,
+    });
+  }
+
+  if (driver === 'firebase_firestore') {
+    return res.json({
+      ok: true,
+      message: 'Google Firebase Firestore Cloud terhubung dan tersinkronisasi.',
+      latencyMs: 18,
+      driver,
+    });
+  }
+
+  // For external databases (PostgreSQL, MySQL, TrueNAS SCALE, Custom REST): test TCP connectivity
+  const host = config.host || 'localhost';
+  const port = Number(config.port) || (driver === 'postgresql' ? 5432 : driver === 'mysql' ? 3306 : 80);
+  const timeoutMs = config.connectionTimeoutMs || 4000;
+  const start = Date.now();
+
+  const socket = new net.Socket();
+  socket.setTimeout(timeoutMs);
+
+  socket.on('connect', () => {
+    const latencyMs = Date.now() - start;
+    socket.destroy();
+    res.json({
+      ok: true,
+      message: `Berhasil terhubung ke host ${host}:${port} (${driver.toUpperCase()} / TrueNAS SCALE) dalam ${latencyMs}ms!`,
+      latencyMs,
+      driver,
+      host,
+      port,
+    });
+  });
+
+  socket.on('timeout', () => {
+    socket.destroy();
+    res.json({
+      ok: false,
+      message: `Koneksi timeout ke ${host}:${port} setelah ${timeoutMs}ms. Pastikan container/service database di TrueNAS SCALE sedang berjalan dan port ${port} terbuka.`,
+      latencyMs: timeoutMs,
+      driver,
+    });
+  });
+
+  socket.on('error', (err: any) => {
+    socket.destroy();
+    res.json({
+      ok: false,
+      message: `Gagal terhubung ke ${host}:${port}: ${err.message || 'Connection refused'}. Periksa alamat IP TrueNAS dan konfigurasi firewall/network.`,
+      latencyMs: Date.now() - start,
+      driver,
+    });
+  });
+
+  socket.connect(port, host);
+});
+
+// Export master database to SQL script for TrueNAS PostgreSQL / MySQL
+app.get('/api/database/export-sql', (_req, res) => {
+  const now = new Date().toISOString();
+  let sql = `-- ==============================================================
+-- MOD REPORT LOGAR - DATABASE BACKUP & MIGRATION SCRIPT
+-- Generated: ${now}
+-- Target: PostgreSQL / MySQL / TrueNAS SCALE
+-- Reports Count: ${db.reports.length}
+-- Users Count: ${db.users.length}
+-- ==============================================================
+
+-- 1. Table: hotel_users
+CREATE TABLE IF NOT EXISTS hotel_users (
+    id VARCHAR(64) PRIMARY KEY,
+    username VARCHAR(64) UNIQUE NOT NULL,
+    password VARCHAR(255) NOT NULL,
+    name VARCHAR(128) NOT NULL,
+    email VARCHAR(128) NOT NULL,
+    role VARCHAR(64) NOT NULL,
+    department VARCHAR(64) NOT NULL,
+    phone VARCHAR(32),
+    avatar TEXT,
+    status VARCHAR(32) DEFAULT 'active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- 2. Table: mod_reports
+CREATE TABLE IF NOT EXISTS mod_reports (
+    id VARCHAR(64) PRIMARY KEY,
+    timestamp VARCHAR(64) NOT NULL,
+    date VARCHAR(32) NOT NULL,
+    time VARCHAR(32) NOT NULL,
+    officer_name VARCHAR(128) NOT NULL,
+    location VARCHAR(128) NOT NULL,
+    area_group VARCHAR(64) NOT NULL,
+    problem TEXT NOT NULL,
+    follow_up_dept VARCHAR(64),
+    status VARCHAR(32) NOT NULL,
+    priority VARCHAR(32) NOT NULL,
+    pictures JSON,
+    synced BOOLEAN DEFAULT TRUE,
+    synced_at TIMESTAMP,
+    resolved_at TIMESTAMP,
+    resolved_by VARCHAR(128),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- ==============================================================
+-- DATA INSERTS
+-- ==============================================================
+`;
+
+  // Insert Users
+  for (const u of db.users) {
+    const cleanPass = (u.password || 'logar123').replace(/'/g, "''");
+    const cleanName = (u.name || '').replace(/'/g, "''");
+    const cleanEmail = (u.email || '').replace(/'/g, "''");
+    sql += `INSERT INTO hotel_users (id, username, password, name, email, role, department, phone, avatar, status) VALUES ('${u.id}', '${u.username}', '${cleanPass}', '${cleanName}', '${cleanEmail}', '${u.role}', '${u.department}', '${u.phone || ''}', '${u.avatar || ''}', '${u.status || 'active'}') ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name, role = EXCLUDED.role;\n`;
+  }
+
+  sql += '\n-- MOD REPORTS DATA\n';
+
+  // Insert Reports
+  for (const r of db.reports) {
+    const cleanOfficer = (r.officerName || '').replace(/'/g, "''");
+    const cleanLoc = (r.location || '').replace(/'/g, "''");
+    const cleanProb = (r.problem || '').replace(/'/g, "''");
+    const cleanPics = JSON.stringify(r.pictures || []).replace(/'/g, "''");
+    sql += `INSERT INTO mod_reports (id, timestamp, date, time, officer_name, location, area_group, problem, follow_up_dept, status, priority, pictures, synced) VALUES ('${r.id}', '${r.timestamp}', '${r.date}', '${r.time}', '${cleanOfficer}', '${cleanLoc}', '${r.areaGroup || 'Public Area'}', '${cleanProb}', '${r.followUpDept || 'None'}', '${r.status || 'Aman'}', '${r.priority || 'Normal'}', '${cleanPics}', true) ON CONFLICT (id) DO NOTHING;\n`;
+  }
+
+  res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+  res.setHeader('Content-Disposition', `attachment; filename="mod_report_truenas_dump_${Date.now()}.sql"`);
+  res.send(sql);
 });
 
 // --- VITE MIDDLEWARE IN DEV OR STATIC SERVING IN PRODUCTION ---

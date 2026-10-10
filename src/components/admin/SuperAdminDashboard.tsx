@@ -75,8 +75,12 @@ import {
   clearAuditLogs,
   exportSystemBackupJson,
   restoreSystemFromBackup,
-  factoryResetSystem
+  factoryResetSystem,
+  DEFAULT_DATABASE_CONNECTION,
+  testDatabaseConnectionApi,
+  generateTrueNasComposeYaml
 } from '../../services/systemSettingsService';
+import type { DatabaseConnectionConfig, DatabaseDriverType } from '../../types/index.ts';
 import { formatBytes, compressImage } from '../../services/imageCompressionService';
 import { calculateStorageSavings, saveReports } from '../../services/storageService';
 import { 
@@ -92,7 +96,7 @@ interface SuperAdminDashboardProps {
   onRefreshData: () => void;
 }
 
-type AdminTab = 'overview' | 'users' | 'permissions' | 'parameters' | 'locations' | 'audit' | 'backup';
+type AdminTab = 'overview' | 'users' | 'permissions' | 'parameters' | 'locations' | 'database' | 'audit' | 'backup';
 
 export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   onBackToApp,
@@ -153,6 +157,102 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
   // Avatar upload ref from device
   const adminAvatarInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingAdminAvatar, setIsUploadingAdminAvatar] = useState(false);
+
+  // Database & TrueNAS SCALE State
+  const [dbConfig, setDbConfig] = useState<DatabaseConnectionConfig>(
+    settings.databaseConnection || DEFAULT_DATABASE_CONNECTION
+  );
+  const [isTestingDb, setIsTestingDb] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{ ok: boolean; message: string; latencyMs?: number } | null>(null);
+  const [isSavingDb, setIsSavingDb] = useState(false);
+  const [showDbPassword, setShowDbPassword] = useState(false);
+  const [copiedCompose, setCopiedCompose] = useState(false);
+
+  const handleDriverChange = (driver: DatabaseDriverType) => {
+    let defaultPort = 5432;
+    if (driver === 'mysql') defaultPort = 3306;
+    if (driver === 'custom_rest' || driver === 'truenas_api') defaultPort = 8080;
+    
+    setDbConfig(prev => ({
+      ...prev,
+      driver,
+      port: defaultPort,
+      username: driver === 'postgresql' ? 'postgres' : driver === 'mysql' ? 'root' : prev.username,
+    }));
+    setDbTestResult(null);
+  };
+
+  const handleTestDatabase = async () => {
+    setIsTestingDb(true);
+    setDbTestResult(null);
+    try {
+      const res = await testDatabaseConnectionApi(dbConfig);
+      setDbTestResult(res);
+      if (res.ok) {
+        showToast('Koneksi database berhasil diverifikasi!');
+        setDbConfig(prev => ({ ...prev, status: 'connected', lastTestedAt: new Date().toISOString() }));
+      } else {
+        showToast('Koneksi database gagal: ' + res.message);
+        setDbConfig(prev => ({ ...prev, status: 'error', errorMessage: res.message }));
+      }
+    } catch (err: any) {
+      setDbTestResult({ ok: false, message: err.message || 'Error pengujian koneksi' });
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
+
+  const handleSaveDatabaseConfig = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSavingDb(true);
+    try {
+      const res = await fetch('/api/database/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: dbConfig }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        const updated = updateSystemSettings({ databaseConnection: dbConfig });
+        setSettings(updated);
+        addAuditLog('DB_CONFIG_UPDATED', `Mengubah koneksi database ke driver ${dbConfig.driver.toUpperCase()} (Host: ${dbConfig.host}:${dbConfig.port})`, 'SETTING');
+        showToast(`Konfigurasi database ${dbConfig.driver.toUpperCase()} berhasil disimpan!`);
+      } else {
+        alert(data.error || 'Gagal menyimpan konfigurasi');
+      }
+    } catch (err: any) {
+      alert('Gagal menyimpan: ' + err.message);
+    } finally {
+      setIsSavingDb(false);
+    }
+  };
+
+  const handleDownloadDockerCompose = () => {
+    const yaml = generateTrueNasComposeYaml(dbConfig);
+    const blob = new Blob([yaml], { type: 'text/yaml;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'docker-compose-truenas.yml';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    showToast('File docker-compose-truenas.yml berhasil diunduh!');
+  };
+
+  const handleCopyDockerCompose = () => {
+    const yaml = generateTrueNasComposeYaml(dbConfig);
+    navigator.clipboard.writeText(yaml);
+    setCopiedCompose(true);
+    setTimeout(() => setCopiedCompose(false), 2500);
+    showToast('Konfigurasi Docker Compose disalin ke clipboard!');
+  };
+
+  const handleDownloadSqlDump = () => {
+    window.location.href = '/api/database/export-sql';
+    showToast('Mengunduh SQL script migrasi database untuk TrueNAS SCALE...');
+  };
 
   const handleAdminAvatarUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -668,6 +768,23 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
           </button>
 
           <button
+            onClick={() => setActiveTab('database')}
+            className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
+              activeTab === 'database'
+                ? 'bg-[#95A823] text-white shadow-md shadow-[#95A823]/30 font-bold'
+                : 'text-[#D9DF98] hover:text-white hover:bg-[#2E2824]'
+            }`}
+          >
+            <div className="flex items-center gap-2.5">
+              <Server className="w-4 h-4 text-[#EAEEBB]" />
+              <span>Database &amp; TrueNAS</span>
+            </div>
+            <span className="text-[10px] bg-[#95A823]/25 text-[#EAEEBB] border border-[#95A823]/40 px-1.5 py-0.5 rounded font-mono font-bold">
+              {dbConfig.driver === 'postgresql' ? 'PG' : dbConfig.driver === 'mysql' ? 'MySQL' : 'JSON'}
+            </span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('audit')}
             className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-xs font-semibold transition ${
               activeTab === 'audit'
@@ -750,6 +867,14 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
               }`}
             >
               Lokasi ({settings.locations.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('database')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 transition cursor-pointer ${
+                activeTab === 'database' ? 'bg-[#95A823] text-white shadow-xs' : 'bg-[#2E2824] text-[#D9DF98]'
+              }`}
+            >
+              Database &amp; TrueNAS
             </button>
             <button
               onClick={() => setActiveTab('audit')}
@@ -1516,6 +1641,470 @@ export const SuperAdminDashboard: React.FC<SuperAdminDashboardProps> = ({
                         </span>
                       </div>
                     ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: DATABASE CONNECTION & TRUENAS SCALE */}
+          {activeTab === 'database' && (
+            <div className="space-y-6">
+              {/* Header Card */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-gradient-to-r from-[#2A2420] via-[#231E1B] to-[#1C1816] p-5 rounded-2xl border border-[#3D352F]">
+                <div>
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-[#95A823] flex items-center justify-center text-white shadow-md shadow-[#95A823]/30">
+                      <Server className="w-4 h-4" />
+                    </div>
+                    <h2 className="text-lg font-bold text-white tracking-tight">
+                      Koneksi Database &amp; TrueNAS SCALE
+                    </h2>
+                  </div>
+                  <p className="text-xs text-[#C6CC81] mt-1">
+                    Ganti driver database atau sambungkan ke PostgreSQL / MySQL yang berjalan di server TrueNAS SCALE on-premise hotel.
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#1A1614] border border-[#3D352F] text-xs">
+                    <span className="text-slate-400">Driver Aktif:</span>
+                    <span className="font-bold text-[#EAEEBB] font-mono uppercase">
+                      {dbConfig.driver}
+                    </span>
+                    <span className={`w-2 h-2 rounded-full ml-1 ${
+                      dbConfig.status === 'connected' ? 'bg-[#95A823]' : dbConfig.status === 'error' ? 'bg-rose-500' : 'bg-amber-400'
+                    }`}></span>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleTestDatabase}
+                    disabled={isTestingDb}
+                    className="px-3.5 py-1.5 bg-[#95A823] hover:bg-[#83941F] text-white text-xs font-bold rounded-xl transition flex items-center gap-1.5 shadow-sm disabled:opacity-50 cursor-pointer"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isTestingDb ? 'animate-spin' : ''}`} />
+                    <span>{isTestingDb ? 'Menguji...' : 'Uji Koneksi'}</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Test Result Alert */}
+              {dbTestResult && (
+                <div className={`p-4 rounded-2xl border text-xs flex items-start gap-3 transition ${
+                  dbTestResult.ok 
+                    ? 'bg-[#1E2B14] border-[#95A823]/60 text-[#EAEEBB]' 
+                    : 'bg-rose-950/40 border-rose-800/60 text-rose-200'
+                }`}>
+                  {dbTestResult.ok ? (
+                    <CheckCircle2 className="w-4 h-4 text-[#95A823] shrink-0 mt-0.5" />
+                  ) : (
+                    <AlertTriangle className="w-4 h-4 text-rose-400 shrink-0 mt-0.5" />
+                  )}
+                  <div className="flex-1">
+                    <p className="font-bold">
+                      {dbTestResult.ok ? 'Koneksi Berhasil Terverifikasi' : 'Uji Koneksi Gagal Terhubung'}
+                    </p>
+                    <p className="mt-0.5 opacity-90 leading-relaxed font-mono text-[11px]">
+                      {dbTestResult.message}
+                    </p>
+                    {dbTestResult.latencyMs !== undefined && (
+                      <span className="inline-block mt-1 text-[10px] bg-black/30 px-2 py-0.5 rounded font-mono">
+                        Latency: {dbTestResult.latencyMs}ms
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* 1. Driver Selection Cards */}
+              <div className="space-y-3">
+                <label className="block text-xs font-bold text-white uppercase tracking-wider">
+                  Pilih Driver Database
+                </label>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                  {/* PostgreSQL (TrueNAS SCALE Favorite) */}
+                  <div
+                    onClick={() => handleDriverChange('postgresql')}
+                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                      dbConfig.driver === 'postgresql'
+                        ? 'bg-[#2E2824] border-[#95A823] shadow-md shadow-[#95A823]/20'
+                        : 'bg-[#1E1A17] border-[#3D352F] hover:border-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">🐘</span>
+                        <span className="text-[10px] font-mono bg-[#95A823]/20 text-[#EAEEBB] px-1.5 py-0.5 rounded font-bold">
+                          Port 5432
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-white text-xs">PostgreSQL</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        Pilihan utama TrueNAS SCALE Apps &amp; ZFS. Skalabilitas transaksi tinggi &amp; integritas ACID.
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#95A823] font-bold">
+                      {dbConfig.driver === 'postgresql' && <Check className="w-3.5 h-3.5" />}
+                      <span>{dbConfig.driver === 'postgresql' ? 'Driver Dipilih' : 'Pilih PostgreSQL'}</span>
+                    </div>
+                  </div>
+
+                  {/* MySQL / MariaDB */}
+                  <div
+                    onClick={() => handleDriverChange('mysql')}
+                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                      dbConfig.driver === 'mysql'
+                        ? 'bg-[#2E2824] border-[#95A823] shadow-md shadow-[#95A823]/20'
+                        : 'bg-[#1E1A17] border-[#3D352F] hover:border-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">🐬</span>
+                        <span className="text-[10px] font-mono bg-[#3A86FF]/20 text-[#3A86FF] px-1.5 py-0.5 rounded font-bold">
+                          Port 3306
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-white text-xs">MySQL / MariaDB</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        Kompatibel luas dengan docker container TrueNAS, Synology, dan server Linux LAMP/LEMP.
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#95A823] font-bold">
+                      {dbConfig.driver === 'mysql' && <Check className="w-3.5 h-3.5" />}
+                      <span>{dbConfig.driver === 'mysql' ? 'Driver Dipilih' : 'Pilih MariaDB'}</span>
+                    </div>
+                  </div>
+
+                  {/* Local JSON / SQLite */}
+                  <div
+                    onClick={() => handleDriverChange('sqlite_json')}
+                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                      dbConfig.driver === 'sqlite_json'
+                        ? 'bg-[#2E2824] border-[#95A823] shadow-md shadow-[#95A823]/20'
+                        : 'bg-[#1E1A17] border-[#3D352F] hover:border-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">📁</span>
+                        <span className="text-[10px] font-mono bg-[#F4A261]/20 text-[#F4A261] px-1.5 py-0.5 rounded font-bold">
+                          File Standalone
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-white text-xs">Local Storage / JSON</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        Penyimpanan berkas lokal terintegrasi. Zero setup, sangat cepat, dan bebas dependensi luar.
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#95A823] font-bold">
+                      {dbConfig.driver === 'sqlite_json' && <Check className="w-3.5 h-3.5" />}
+                      <span>{dbConfig.driver === 'sqlite_json' ? 'Driver Dipilih' : 'Pilih Local Storage'}</span>
+                    </div>
+                  </div>
+
+                  {/* Firebase Firestore */}
+                  <div
+                    onClick={() => handleDriverChange('firebase_firestore')}
+                    className={`p-4 rounded-2xl border transition cursor-pointer flex flex-col justify-between ${
+                      dbConfig.driver === 'firebase_firestore'
+                        ? 'bg-[#2E2824] border-[#95A823] shadow-md shadow-[#95A823]/20'
+                        : 'bg-[#1E1A17] border-[#3D352F] hover:border-slate-600'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-2xl">☁️</span>
+                        <span className="text-[10px] font-mono bg-[#E76F51]/20 text-[#E76F51] px-1.5 py-0.5 rounded font-bold">
+                          Cloud NoSQL
+                        </span>
+                      </div>
+                      <h4 className="font-bold text-white text-xs">Google Firestore</h4>
+                      <p className="text-[11px] text-slate-400 mt-1 leading-relaxed">
+                        Sinkronisasi cloud global real-time lintas jaringan seluler &amp; multi-IP tanpa konfigurasi port.
+                      </p>
+                    </div>
+                    <div className="mt-3 flex items-center gap-1.5 text-[10px] text-[#95A823] font-bold">
+                      {dbConfig.driver === 'firebase_firestore' && <Check className="w-3.5 h-3.5" />}
+                      <span>{dbConfig.driver === 'firebase_firestore' ? 'Driver Dipilih' : 'Pilih Firestore'}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Connection Parameters Form */}
+              <form onSubmit={handleSaveDatabaseConfig} className="bg-[#1E1A17] border border-[#3D352F] rounded-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#3D352F]">
+                  <div className="flex items-center gap-2">
+                    <Settings className="w-4 h-4 text-[#95A823]" />
+                    <h3 className="font-bold text-white text-sm">
+                      Parameter Koneksi {dbConfig.driver === 'postgresql' ? 'PostgreSQL TrueNAS' : dbConfig.driver === 'mysql' ? 'MySQL TrueNAS' : 'Database Server'}
+                    </h3>
+                  </div>
+                  <span className="text-[11px] text-slate-400">
+                    Host &amp; Port dapat diarahkan ke IP lokal TrueNAS SCALE hotel
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+                  {/* Host IP */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Host Server / IP Address <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={dbConfig.host}
+                      onChange={(e) => setDbConfig({ ...dbConfig, host: e.target.value })}
+                      placeholder="Contoh: 192.168.1.100 atau truenas.local"
+                      required
+                      className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono focus:outline-none focus:border-[#95A823]"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-0.5">Alamat IP server TrueNAS SCALE atau host database</p>
+                  </div>
+
+                  {/* Port */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Port Koneksi <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={dbConfig.port}
+                      onChange={(e) => setDbConfig({ ...dbConfig, port: Number(e.target.value) || 5432 })}
+                      placeholder="5432"
+                      required
+                      className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono focus:outline-none focus:border-[#95A823]"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-0.5">Standard: 5432 (Postgres), 3306 (MySQL)</p>
+                  </div>
+
+                  {/* Database Name */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Nama Database <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={dbConfig.databaseName}
+                      onChange={(e) => setDbConfig({ ...dbConfig, databaseName: e.target.value })}
+                      placeholder="mod_report_logar"
+                      required
+                      className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono focus:outline-none focus:border-[#95A823]"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-0.5">Database skema untuk tabel MOD</p>
+                  </div>
+
+                  {/* Username */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Username Database <span className="text-rose-400">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={dbConfig.username}
+                      onChange={(e) => setDbConfig({ ...dbConfig, username: e.target.value })}
+                      placeholder="postgres / root"
+                      required
+                      className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono focus:outline-none focus:border-[#95A823]"
+                    />
+                  </div>
+
+                  {/* Password */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Password Database
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showDbPassword ? 'text' : 'password'}
+                        value={dbConfig.password || ''}
+                        onChange={(e) => setDbConfig({ ...dbConfig, password: e.target.value })}
+                        placeholder="••••••••"
+                        className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono pr-9 focus:outline-none focus:border-[#95A823]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowDbPassword(!showDbPassword)}
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      >
+                        {showDbPassword ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* TrueNAS Dataset Mount Path */}
+                  <div>
+                    <label className="block text-slate-300 font-semibold mb-1">
+                      Path TrueNAS ZFS Dataset Mount
+                    </label>
+                    <input
+                      type="text"
+                      value={dbConfig.trueNasDatasetPath || ''}
+                      onChange={(e) => setDbConfig({ ...dbConfig, trueNasDatasetPath: e.target.value })}
+                      placeholder="/mnt/tank/apps/mod_report/data"
+                      className="w-full px-3 py-2 bg-[#120F0E] border border-[#3D352F] rounded-xl text-white font-mono text-[11px] focus:outline-none focus:border-[#95A823]"
+                    />
+                    <p className="text-[10px] text-slate-500 mt-0.5">Lokasi volume ZFS di TrueNAS SCALE</p>
+                  </div>
+                </div>
+
+                {/* Additional Toggles */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#120F0E] border border-[#3D352F] cursor-pointer hover:border-[#95A823]/50 transition">
+                    <input
+                      type="checkbox"
+                      checked={dbConfig.enableLocalFallback}
+                      onChange={(e) => setDbConfig({ ...dbConfig, enableLocalFallback: e.target.checked })}
+                      className="mt-0.5 rounded accent-[#95A823]"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Failover Penyimpanan Lokal</span>
+                      <span className="text-[10px] text-slate-400">Jika TrueNAS offline, sistem beralih otomatis ke cache tanpa error</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#120F0E] border border-[#3D352F] cursor-pointer hover:border-[#95A823]/50 transition">
+                    <input
+                      type="checkbox"
+                      checked={dbConfig.enableFirestoreDualSync}
+                      onChange={(e) => setDbConfig({ ...dbConfig, enableFirestoreDualSync: e.target.checked })}
+                      className="mt-0.5 rounded accent-[#95A823]"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Replikasi Firestore Cloud</span>
+                      <span className="text-[10px] text-slate-400">Sinkronkan laporan ke Google Cloud Firestore sebagai cadangan</span>
+                    </div>
+                  </label>
+
+                  <label className="flex items-start gap-2.5 p-3 rounded-xl bg-[#120F0E] border border-[#3D352F] cursor-pointer hover:border-[#95A823]/50 transition">
+                    <input
+                      type="checkbox"
+                      checked={dbConfig.ssl}
+                      onChange={(e) => setDbConfig({ ...dbConfig, ssl: e.target.checked })}
+                      className="mt-0.5 rounded accent-[#95A823]"
+                    />
+                    <div className="text-xs">
+                      <span className="font-bold text-white block">Enkripsi SSL / TLS</span>
+                      <span className="text-[10px] text-slate-400">Aktifkan enkripsi transmisi database over network</span>
+                    </div>
+                  </label>
+                </div>
+
+                {/* Form Buttons */}
+                <div className="flex items-center justify-end gap-3 pt-3 border-t border-[#3D352F]">
+                  <button
+                    type="button"
+                    onClick={handleTestDatabase}
+                    disabled={isTestingDb}
+                    className="px-4 py-2 bg-[#2E2824] hover:bg-[#3D352F] text-[#EAEEBB] text-xs font-bold rounded-xl transition flex items-center gap-2 border border-[#453D37]"
+                  >
+                    <RefreshCw className={`w-3.5 h-3.5 ${isTestingDb ? 'animate-spin' : ''}`} />
+                    <span>Uji Koneksi ({dbConfig.host}:{dbConfig.port})</span>
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSavingDb}
+                    className="px-5 py-2 bg-[#95A823] hover:bg-[#83941F] text-white text-xs font-bold rounded-xl transition flex items-center gap-2 shadow-md shadow-[#95A823]/30 disabled:opacity-50"
+                  >
+                    <Server className="w-3.5 h-3.5" />
+                    <span>{isSavingDb ? 'Menyimpan...' : 'Simpan Konfigurasi Database'}</span>
+                  </button>
+                </div>
+              </form>
+
+              {/* 3. TrueNAS SCALE Deployment & Migration Tools */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Docker Compose Box */}
+                <div className="bg-[#1E1A17] border border-[#3D352F] rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-white font-bold text-sm">
+                      <Layers className="w-4 h-4 text-[#95A823]" />
+                      <span>Docker Compose untuk TrueNAS SCALE</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Deploy aplikasi MOD Report bersama container database PostgreSQL / MariaDB di TrueNAS SCALE (Apps &gt; Custom App / Launch Docker Image).
+                    </p>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDownloadDockerCompose}
+                        className="flex-1 py-2.5 bg-[#95A823] hover:bg-[#83941F] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                      >
+                        <Download className="w-4 h-4" />
+                        <span>Unduh docker-compose.yml</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={handleCopyDockerCompose}
+                        className="px-3.5 py-2.5 bg-[#2E2824] hover:bg-[#3D352F] text-[#EAEEBB] rounded-xl text-xs font-bold transition flex items-center gap-1.5 border border-[#453D37] cursor-pointer"
+                        title="Salin YAML ke Clipboard"
+                      >
+                        {copiedCompose ? <Check className="w-4 h-4 text-[#95A823]" /> : <Copy className="w-4 h-4" />}
+                        <span>{copiedCompose ? 'Tersalin' : 'Salin'}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SQL Migration Script Box */}
+                <div className="bg-[#1E1A17] border border-[#3D352F] rounded-2xl p-5 flex flex-col justify-between space-y-4">
+                  <div>
+                    <div className="flex items-center gap-2 text-white font-bold text-sm">
+                      <Database className="w-4 h-4 text-[#3A86FF]" />
+                      <span>Ekspor Skema &amp; Data SQL (.sql)</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1 leading-relaxed">
+                      Unduh dump database SQL berisi seluruh {reports.length} laporan MOD dan {users.length} akun petugas. Siap diimpor langsung ke PostgreSQL atau MySQL di TrueNAS.
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadSqlDump}
+                    className="w-full py-2.5 bg-[#3A86FF] hover:bg-[#2563EB] text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-2 shadow-sm cursor-pointer"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Unduh Master Data SQL ({reports.length} Laporan)</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* 4. TrueNAS SCALE Guide Box */}
+              <div className="bg-[#181412] border border-[#3D352F] rounded-2xl p-5 space-y-3">
+                <div className="flex items-center gap-2 text-[#EAEEBB] font-bold text-xs">
+                  <Info className="w-4 h-4 text-[#95A823]" />
+                  <span>Panduan Langkah Deployment di TrueNAS SCALE</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 text-xs">
+                  <div className="p-3 rounded-xl bg-[#231E1B] border border-[#3D352F]">
+                    <span className="text-[10px] font-mono bg-[#95A823]/20 text-[#EAEEBB] px-1.5 py-0.5 rounded font-bold">Langkah 1</span>
+                    <p className="font-bold text-white mt-1">Buat ZFS Dataset</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Buka <strong>Storage &gt; Pools</strong> di TrueNAS. Tambahkan dataset baru (misal: <code className="text-[#95A823]">/mnt/tank/apps/mod_report</code>).</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#231E1B] border border-[#3D352F]">
+                    <span className="text-[10px] font-mono bg-[#95A823]/20 text-[#EAEEBB] px-1.5 py-0.5 rounded font-bold">Langkah 2</span>
+                    <p className="font-bold text-white mt-1">Deploy Apps</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Pilih <strong>Apps &gt; Discover Apps &gt; Custom App</strong> (atau gunakan Dockge / Portainer) lalu paste file Compose.</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#231E1B] border border-[#3D352F]">
+                    <span className="text-[10px] font-mono bg-[#95A823]/20 text-[#EAEEBB] px-1.5 py-0.5 rounded font-bold">Langkah 3</span>
+                    <p className="font-bold text-white mt-1">Mount Storage</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Arahkan Host Path ke dataset TrueNAS untuk folder <code className="text-[#95A823]">/app/data</code> dan <code className="text-[#95A823]">/app/uploads</code>.</p>
+                  </div>
+
+                  <div className="p-3 rounded-xl bg-[#231E1B] border border-[#3D352F]">
+                    <span className="text-[10px] font-mono bg-[#95A823]/20 text-[#EAEEBB] px-1.5 py-0.5 rounded font-bold">Langkah 4</span>
+                    <p className="font-bold text-white mt-1">Akses &amp; Selesai</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Aplikasi dapat diakses di jaringan lokal hotel melalui <code className="text-[#95A823]">http://IP-TRUENAS:3000</code>.</p>
                   </div>
                 </div>
               </div>

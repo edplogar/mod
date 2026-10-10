@@ -204,23 +204,53 @@ export function subscribeToFirestoreReports(
 }
 
 /**
- * Upsert a single report in Firestore
+ * Upsert a single report in Firestore with debounced batching
  */
-export async function saveReportToFirestore(report: ModReportItem): Promise<void> {
-  if (firestoreQuotaExceededState) return;
-  const path = `reports/${report.id}`;
-  try {
-    await setDoc(doc(db, 'reports', report.id), {
+let reportBatchMap = new Map<string, ModReportItem>();
+let reportBatchTimer: NodeJS.Timeout | null = null;
+
+function flushReportBatch() {
+  if (reportBatchMap.size === 0 || firestoreQuotaExceededState) return;
+  const items = Array.from(reportBatchMap.values());
+  reportBatchMap.clear();
+  if (reportBatchTimer) {
+    clearTimeout(reportBatchTimer);
+    reportBatchTimer = null;
+  }
+
+  const batch = writeBatch(db);
+  const now = new Date().toISOString();
+  items.forEach(report => {
+    const ref = doc(db, 'reports', report.id);
+    batch.set(ref, {
       ...report,
       synced: true,
-      syncedAt: new Date().toISOString(),
+      syncedAt: now,
     });
-  } catch (error) {
+  });
+
+  batch.commit().catch(error => {
     if (isQuotaExceededError(error)) {
       setFirestoreQuotaExceeded(true);
       return;
     }
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('Batch report write error:', error);
+  });
+}
+
+export async function saveReportToFirestore(report: ModReportItem): Promise<void> {
+  if (firestoreQuotaExceededState) return;
+  reportBatchMap.set(report.id, report);
+
+  if (reportBatchMap.size >= 25) {
+    flushReportBatch();
+    return;
+  }
+
+  if (!reportBatchTimer) {
+    reportBatchTimer = setTimeout(() => {
+      flushReportBatch();
+    }, 800);
   }
 }
 
@@ -331,19 +361,48 @@ export function subscribeToFirestoreUsers(
 }
 
 /**
- * Upsert a user in Firestore
+ * Upsert a user in Firestore with debounced batching
  */
-export async function saveUserToFirestore(user: UserProfile): Promise<void> {
-  if (firestoreQuotaExceededState) return;
-  const path = `users/${user.id}`;
-  try {
-    await setDoc(doc(db, 'users', user.id), user);
-  } catch (error) {
+let userBatchMap = new Map<string, UserProfile>();
+let userBatchTimer: NodeJS.Timeout | null = null;
+
+function flushUserBatch() {
+  if (userBatchMap.size === 0 || firestoreQuotaExceededState) return;
+  const items = Array.from(userBatchMap.values());
+  userBatchMap.clear();
+  if (userBatchTimer) {
+    clearTimeout(userBatchTimer);
+    userBatchTimer = null;
+  }
+
+  const batch = writeBatch(db);
+  items.forEach(user => {
+    const ref = doc(db, 'users', user.id);
+    batch.set(ref, user);
+  });
+
+  batch.commit().catch(error => {
     if (isQuotaExceededError(error)) {
       setFirestoreQuotaExceeded(true);
       return;
     }
-    handleFirestoreError(error, OperationType.WRITE, path);
+    console.error('Batch user write error:', error);
+  });
+}
+
+export async function saveUserToFirestore(user: UserProfile): Promise<void> {
+  if (firestoreQuotaExceededState) return;
+  userBatchMap.set(user.id, user);
+
+  if (userBatchMap.size >= 20) {
+    flushUserBatch();
+    return;
+  }
+
+  if (!userBatchTimer) {
+    userBatchTimer = setTimeout(() => {
+      flushUserBatch();
+    }, 800);
   }
 }
 
@@ -413,20 +472,34 @@ export function subscribeToFirestoreSettings(
 }
 
 /**
- * Save System Settings to Firestore
+ * Save System Settings to Firestore with debouncing
  */
+let pendingSettings: SystemSettings | null = null;
+let settingsDebounceTimer: NodeJS.Timeout | null = null;
+
 export async function saveSettingsToFirestore(settings: SystemSettings): Promise<void> {
   if (firestoreQuotaExceededState) return;
-  const path = 'settings/system';
-  try {
-    await setDoc(doc(db, 'settings', 'system'), settings);
-  } catch (error) {
-    if (isQuotaExceededError(error)) {
-      setFirestoreQuotaExceeded(true);
-      return;
-    }
-    handleFirestoreError(error, OperationType.WRITE, path);
+  pendingSettings = settings;
+
+  if (settingsDebounceTimer) {
+    clearTimeout(settingsDebounceTimer);
   }
+
+  settingsDebounceTimer = setTimeout(async () => {
+    settingsDebounceTimer = null;
+    const dataToSave = pendingSettings;
+    pendingSettings = null;
+    if (!dataToSave) return;
+    try {
+      await setDoc(doc(db, 'settings', 'system'), dataToSave);
+    } catch (error) {
+      if (isQuotaExceededError(error)) {
+        setFirestoreQuotaExceeded(true);
+        return;
+      }
+      handleFirestoreError(error, OperationType.WRITE, 'settings/system');
+    }
+  }, 1000);
 }
 
 /**
@@ -457,18 +530,47 @@ export function subscribeToFirestoreAuditLogs(
 }
 
 /**
- * Add Audit Log to Firestore
+ * Add Audit Log to Firestore with debounced batching
  */
-export async function addAuditLogToFirestore(log: SystemAuditLog): Promise<void> {
-  if (firestoreQuotaExceededState) return;
-  const path = `audit_logs/${log.id}`;
-  try {
-    await setDoc(doc(db, 'audit_logs', log.id), log);
-  } catch (error) {
+let auditLogQueue: SystemAuditLog[] = [];
+let auditLogBatchTimer: NodeJS.Timeout | null = null;
+
+function flushAuditLogBatch() {
+  if (auditLogQueue.length === 0 || firestoreQuotaExceededState) return;
+  const items = [...auditLogQueue];
+  auditLogQueue = [];
+  if (auditLogBatchTimer) {
+    clearTimeout(auditLogBatchTimer);
+    auditLogBatchTimer = null;
+  }
+
+  const batch = writeBatch(db);
+  items.forEach(log => {
+    const ref = doc(db, 'audit_logs', log.id || `log_${Date.now()}_${Math.random().toString(36).substring(2,6)}`);
+    batch.set(ref, log);
+  });
+
+  batch.commit().catch(error => {
     if (isQuotaExceededError(error)) {
       setFirestoreQuotaExceeded(true);
       return;
     }
-    handleFirestoreError(error, OperationType.CREATE, path);
+    console.error('Batch audit log write error:', error);
+  });
+}
+
+export async function addAuditLogToFirestore(log: SystemAuditLog): Promise<void> {
+  if (firestoreQuotaExceededState) return;
+  auditLogQueue.push(log);
+
+  if (auditLogQueue.length >= 20) {
+    flushAuditLogBatch();
+    return;
+  }
+
+  if (!auditLogBatchTimer) {
+    auditLogBatchTimer = setTimeout(() => {
+      flushAuditLogBatch();
+    }, 1000);
   }
 }

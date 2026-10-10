@@ -3,6 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script>
+      // Suppress harmless Vite HMR WebSocket closing events in AI Studio preview environment
+      (function() {
+        var origConsoleError = console.error;
+        console.error = function() {
+          var args = Array.prototype.slice.call(arguments);
+          if (args.some(function(arg) {
+            return typeof arg === 'string' && (arg.indexOf('WebSocket closed without opened') !== -1 || arg.indexOf('[vite] connecting...') !== -1);
+          })) {
+            return;
+          }
+          origConsoleError.apply(console, args);
+        };
+        window.addEventListener('error', function(e) {
+          if (e && e.message && e.message.indexOf('WebSocket closed without opened') !== -1) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e && e.reason ? (e.reason.message || String(e.reason)) : '';
+          if (reason.indexOf('WebSocket closed without opened') !== -1) {
+            e.stopImmediatePropagation();
+            e.preventDefault();
+          }
+        }, true);
+      })();
+    </script>
     <title>MOD REPORT LOGAR - Hotel Lombok Garden</title>
     <meta name="description" content="Aplikasi dasbor visualisasi data interaktif Manager on Duty (MOD) Hotel Lombok Garden dengan Chart.js, ekspor PDF otomatis, kompresi gambar Google Drive hemat ruang, dan sinkronisasi cloud." />
     <meta property="og:title" content="MOD REPORT LOGAR - Hotel Lombok Garden" />

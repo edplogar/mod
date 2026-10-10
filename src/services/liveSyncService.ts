@@ -1,6 +1,6 @@
 import { UserProfile, ModReportItem, SystemSettings, SystemAuditLog } from '../types';
 import { normalizeSystemSettings } from './systemSettingsService';
-import { saveReports } from './storageService';
+import { saveReports, loadReports, mergeReportLists } from './storageService';
 import { saveAllUsers, deduplicateUsers } from './authService';
 
 const SYNC_VERSION_KEY = 'mod_report_client_sync_version_v1';
@@ -51,9 +51,11 @@ export function applyDatabaseSync(data: FullSyncPayload): void {
       window.dispatchEvent(new CustomEvent('logar_users_updated', { detail: cleanUsers }));
     }
 
-    if (Array.isArray(data.reports)) {
-      saveReports(data.reports);
-      window.dispatchEvent(new CustomEvent('logar_reports_updated', { detail: data.reports }));
+    if (Array.isArray(data.reports) && data.reports.length > 0) {
+      const current = loadReports();
+      const merged = mergeReportLists(current, data.reports);
+      saveReports(merged);
+      window.dispatchEvent(new CustomEvent('logar_reports_updated', { detail: merged }));
     }
 
     if (data.settings) {
@@ -123,8 +125,9 @@ export function startLiveDatabaseSync(): () => void {
   fetchFullDatabaseSync();
 
   // 2. Connect to Server-Sent Events (SSE)
+  let isClosed = false;
   const connectSSE = () => {
-    if (typeof EventSource === 'undefined') return;
+    if (isClosed || typeof EventSource === 'undefined') return;
     try {
       if (eventSource) {
         eventSource.close();
@@ -134,8 +137,8 @@ export function startLiveDatabaseSync(): () => void {
       eventSource.onmessage = (event) => {
         try {
           const payload = JSON.parse(event.data);
-          if (payload && payload.version !== currentClientVersion) {
-            // Version mismatch - fetch latest full state
+          if (payload) {
+            // Fetch immediately on any data change event or version bump
             fetchFullDatabaseSync();
           }
         } catch {
@@ -144,10 +147,12 @@ export function startLiveDatabaseSync(): () => void {
       };
 
       eventSource.onerror = () => {
-        // SSE reconnects automatically, but close if fatal
-        if (eventSource && eventSource.readyState === EventSource.CLOSED) {
+        if (eventSource) {
           eventSource.close();
           eventSource = null;
+        }
+        if (!isClosed) {
+          setTimeout(connectSSE, 2500);
         }
       };
     } catch (e) {
@@ -157,7 +162,7 @@ export function startLiveDatabaseSync(): () => void {
 
   connectSSE();
 
-  // 3. Fallback heartbeat polling every 3.5 seconds
+  // 3. Fallback heartbeat polling every 2.5 seconds
   if (pollTimer) clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
     try {
@@ -173,10 +178,11 @@ export function startLiveDatabaseSync(): () => void {
     } catch {
       // Offline fallback
     }
-  }, 3500);
+  }, 2500);
 
   // Return teardown function
   return () => {
+    isClosed = true;
     if (eventSource) {
       eventSource.close();
       eventSource = null;

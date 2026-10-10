@@ -238,9 +238,31 @@ function flushReportBatch() {
   });
 }
 
-export async function saveReportToFirestore(report: ModReportItem): Promise<void> {
+export async function saveReportToFirestore(report: ModReportItem, immediate: boolean = true): Promise<void> {
   if (firestoreQuotaExceededState) return;
-  reportBatchMap.set(report.id, report);
+
+  const now = new Date().toISOString();
+  const reportToSave: ModReportItem = {
+    ...report,
+    synced: true,
+    syncedAt: now,
+  };
+
+  if (immediate) {
+    try {
+      await setDoc(doc(db, 'reports', report.id), reportToSave);
+      return;
+    } catch (error) {
+      if (isQuotaExceededError(error)) {
+        setFirestoreQuotaExceeded(true);
+        return;
+      }
+      console.warn('Real-time write deferred to batch:', error);
+    }
+  }
+
+  // Fallback or batched write queue
+  reportBatchMap.set(report.id, reportToSave);
 
   if (reportBatchMap.size >= 25) {
     flushReportBatch();

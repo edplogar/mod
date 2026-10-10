@@ -12,6 +12,53 @@ const CLEARED_KEY = 'mod_report_logar_cleared_v1';
 let memoryReportsCache: ModReportItem[] | null = null;
 
 /**
+ * Merges two report lists by ID, ensuring no duplicate items
+ * and preserving latest status, pictures, and notes across devices.
+ */
+export function mergeReportLists(base: ModReportItem[], incoming: ModReportItem[]): ModReportItem[] {
+  if (!Array.isArray(incoming) || incoming.length === 0) return base || [];
+  if (!Array.isArray(base) || base.length === 0) {
+    return incoming.filter(r => isDateOnOrAfterOctober2026(r.date || r.timestamp));
+  }
+
+  const map = new Map<string, ModReportItem>();
+  for (const r of base) {
+    if (r && r.id) {
+      map.set(r.id, r);
+    }
+  }
+
+  for (const r of incoming) {
+    if (!r || !r.id) continue;
+    const existing = map.get(r.id);
+    if (!existing) {
+      map.set(r.id, r);
+    } else {
+      const preferIncoming = (r.syncedAt || '') >= (existing.syncedAt || '') ||
+                             (r.status === 'Selesai' && existing.status !== 'Selesai') ||
+                             (r.pictures && r.pictures.length >= (existing.pictures?.length || 0));
+      map.set(r.id, {
+        ...(preferIncoming ? existing : r),
+        ...(preferIncoming ? r : existing),
+        status: r.status || existing.status,
+        resolvedAt: r.resolvedAt || existing.resolvedAt,
+        resolvedBy: r.resolvedBy || existing.resolvedBy,
+        resolutionDurationHours: r.resolutionDurationHours ?? existing.resolutionDurationHours,
+      });
+    }
+  }
+
+  const result = Array.from(map.values()).filter(r => isDateOnOrAfterOctober2026(r.date || r.timestamp));
+  result.sort((a, b) => {
+    const dtA = `${a.date || ''} ${a.time || ''}`.trim();
+    const dtB = `${b.date || ''} ${b.time || ''}`.trim();
+    return dtB.localeCompare(dtA);
+  });
+
+  return result;
+}
+
+/**
  * Sanitizes reports before storing in browser localStorage:
  * Strips huge base64 data URIs from thumbnailUrl (> 1KB) to prevent 5MB localStorage quota exhaustion.
  * All core metadata, timestamps, officer, problem, status, and Google Drive links are preserved.

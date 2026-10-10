@@ -600,7 +600,45 @@ async function startServer() {
 
   app.listen(PORT, HOST, () => {
     console.log(`[LOGAR Server] Running on http://${HOST}:${PORT} (Mode: ${isProduction ? 'Production' : 'Development'})`);
+    // Bidirectional sync with Firestore in background on startup
+    syncFirestoreToDatabase().catch(() => {});
   });
+}
+
+async function syncFirestoreToDatabase(): Promise<void> {
+  try {
+    const { initializeApp } = await import('firebase/app');
+    const { getFirestore, collection, getDocs } = await import('firebase/firestore');
+    const configPath = path.resolve(__dirname, 'firebase-applet-config.json');
+    if (!fs.existsSync(configPath)) return;
+
+    const config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    const fApp = initializeApp(config, 'server-firestore-sync-' + Date.now());
+    const fDb = getFirestore(fApp, config.firestoreDatabaseId);
+
+    const snap = await getDocs(collection(fDb, 'reports'));
+    if (!snap.empty) {
+      const firestoreReports = snap.docs.map(d => ({ ...d.data(), id: d.id })) as ModReportItem[];
+      const map = new Map<string, ModReportItem>();
+      for (const r of db.reports) {
+        if (r && r.id) map.set(r.id, r);
+      }
+      let changed = false;
+      for (const r of firestoreReports) {
+        if (r && r.id && !map.has(r.id)) {
+          map.set(r.id, r);
+          changed = true;
+        }
+      }
+      if (changed) {
+        db.reports = Array.from(map.values());
+        saveDatabaseToDisk();
+        console.log(`[DB] Merged reports from Firestore on startup. Total reports: ${db.reports.length}`);
+      }
+    }
+  } catch (err) {
+    console.warn('[DB] Initial Firestore sync deferred:', err);
+  }
 }
 
 startServer().catch(err => {

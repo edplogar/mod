@@ -5,7 +5,8 @@ import {
   getSyncState, 
   syncReportsToCloud, 
   saveSyncConfig,
-  clearAllReports
+  clearAllReports,
+  mergeReportLists
 } from './services/storageService';
 import { 
   getStoredUser, 
@@ -139,10 +140,13 @@ export default function App() {
     // Real-time synchronization for MOD reports across all devices & IPs
     const unsubReports = subscribeToFirestoreReports(
       (cloudReports) => {
-        if (cloudReports) {
-          setReports(cloudReports);
-          saveReports(cloudReports);
-          setSyncState(getSyncState(cloudReports));
+        if (cloudReports && Array.isArray(cloudReports) && cloudReports.length > 0) {
+          setReports((prevReports) => {
+            const merged = mergeReportLists(prevReports, cloudReports);
+            saveReports(merged);
+            setSyncState(getSyncState(merged));
+            return merged;
+          });
         }
       },
       (err) => console.warn('Real-time reports listener note:', err)
@@ -214,9 +218,13 @@ export default function App() {
     window.addEventListener('logar_settings_updated', handleSettingsUpdated);
 
     const handleReportsUpdated = (e: any) => {
-      if (e.detail && Array.isArray(e.detail)) {
-        setReports(e.detail);
-        setSyncState(getSyncState(e.detail));
+      if (e.detail && Array.isArray(e.detail) && e.detail.length > 0) {
+        setReports((prevReports) => {
+          const merged = mergeReportLists(prevReports, e.detail);
+          saveReports(merged);
+          setSyncState(getSyncState(merged));
+          return merged;
+        });
       }
     };
     window.addEventListener('logar_reports_updated', handleReportsUpdated);
@@ -227,7 +235,7 @@ export default function App() {
       window.removeEventListener('logar_settings_updated', handleSettingsUpdated);
       window.removeEventListener('logar_reports_updated', handleReportsUpdated);
     };
-  }, [reports, showToast]);
+  }, [showToast]);
 
   // Cloud sync trigger
   const handleTriggerSync = useCallback(async () => {

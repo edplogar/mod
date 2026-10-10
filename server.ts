@@ -772,6 +772,59 @@ async function startServer() {
       appType: 'spa',
     });
 
+    // Intercept and sanitize /@vite/client to completely eliminate WebSocket closed without opened in cloud preview
+    app.get('/@vite/client', async (_req, res, next) => {
+      try {
+        const mod = await vite.transformRequest('/@vite/client');
+        if (mod && mod.code) {
+          let code = mod.code;
+          code = code.replaceAll(
+            'reject(/* @__PURE__ */ new Error("WebSocket closed without opened."));',
+            'resolve();'
+          );
+          code = code.replaceAll(
+            'new WebSocket(`${socketProtocol}://${socketHost}?token=${wsToken}`, "vite-hmr")',
+            '({ readyState: 1, OPEN: 1, addEventListener(t, f) { if(t === "open") setTimeout(f, 0); }, removeEventListener() {}, send() {}, close() {} })'
+          );
+          code = code.replaceAll(
+            'new WebSocket(`${socketProtocol}://${directSocketHost}?token=${wsToken}`, "vite-hmr")',
+            '({ readyState: 1, OPEN: 1, addEventListener(t, f) { if(t === "open") setTimeout(f, 0); }, removeEventListener() {}, send() {}, close() {} })'
+          );
+          code = code.replaceAll(
+            'new WebSocket(socketUrl, "vite-ping")',
+            '({ readyState: 1, OPEN: 1, addEventListener() {}, removeEventListener() {}, send() {}, close() {} })'
+          );
+          res.setHeader('Content-Type', 'application/javascript');
+          res.setHeader('Cache-Control', 'no-store');
+          return res.send(code);
+        }
+      } catch (err) {
+        console.warn('[LOGAR Server] Note: serving default @vite/client');
+      }
+      next();
+    });
+
+    // Intercept page requests before vite.middlewares to ensure HTML has guard script at the top
+    app.get('/', async (req, res, next) => {
+      try {
+        let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
+        template = await vite.transformIndexHtml(req.originalUrl, template);
+        const viteClientTag = '<script type="module" src="/@vite/client"></script>';
+        if (template.includes(viteClientTag)) {
+          const guardMatch = template.match(/<script>[\s\S]*?ViteMockWebSocket[\s\S]*?<\/script>/);
+          if (guardMatch && guardMatch[0]) {
+            const guardScript = guardMatch[0];
+            template = template.replace(guardScript, '');
+            template = template.replace(viteClientTag, guardScript + '\n    ' + viteClientTag);
+          }
+        }
+        res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+      } catch (e) {
+        vite.ssrFixStacktrace(e as Error);
+        next(e);
+      }
+    });
+
     app.use(vite.middlewares);
 
     app.use('*', async (req, res, next) => {
@@ -779,6 +832,16 @@ async function startServer() {
       try {
         let template = fs.readFileSync(path.resolve(__dirname, 'index.html'), 'utf-8');
         template = await vite.transformIndexHtml(url, template);
+        // Ensure WebSocket guard script runs BEFORE /@vite/client
+        const viteClientTag = '<script type="module" src="/@vite/client"></script>';
+        if (template.includes(viteClientTag)) {
+          const guardMatch = template.match(/<script>[\s\S]*?ViteMockWebSocket[\s\S]*?<\/script>/);
+          if (guardMatch && guardMatch[0]) {
+            const guardScript = guardMatch[0];
+            template = template.replace(guardScript, '');
+            template = template.replace(viteClientTag, guardScript + '\n    ' + viteClientTag);
+          }
+        }
         res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
       } catch (e) {
         vite.ssrFixStacktrace(e as Error);
